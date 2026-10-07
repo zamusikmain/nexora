@@ -54,15 +54,15 @@ export function useI18n() {
 }
 
 export function Language() {
-  const { lang, setLang } = useI18n();
+  const { lang, setLang, t } = useI18n();
   return (
     <select
-      aria-label="Language / Язык"
+      aria-label={t("languageLabel")}
       value={lang}
       onChange={(e) => setLang(e.target.value)}
     >
-      <option value="ru">Русский</option>
-      <option value="en">English</option>
+      <option value="ru">{t("languageRu")}</option>
+      <option value="en">{t("languageEn")}</option>
     </select>
   );
 }

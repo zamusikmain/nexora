@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     BigInteger,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
@@ -98,6 +99,14 @@ class Document(Timestamped, Base):
             name="fk_document_current_version",
             use_alter=True,
         ),
+        CheckConstraint(
+            "confidentiality IN ('PUBLIC','INTERNAL','CONFIDENTIAL','RESTRICTED')",
+            name="document_confidentiality",
+        ),
+        CheckConstraint(
+            "effective_date IS NULL OR expiration_date IS NULL OR expiration_date >= effective_date",
+            name="document_dates",
+        ),
         Index("ix_documents_department_status", "department_id", "status"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
@@ -109,6 +118,32 @@ class Document(Timestamped, Base):
     status: Mapped[str] = mapped_column(String(30), default="DRAFT")
     business_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     current_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    description: Mapped[str] = mapped_column(String(4000), default="", server_default="")
+    category: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    responsible_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
+    confidentiality: Mapped[str] = mapped_column(String(20), default="INTERNAL", server_default="INTERNAL")
+    effective_date: Mapped[date | None] = mapped_column(Date)
+    expiration_date: Mapped[date | None] = mapped_column(Date)
+    folder_id: Mapped[str | None] = mapped_column(ForeignKey("folders.id"), index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+
+
+class Folder(Timestamped, Base):
+    __tablename__ = "folders"
+    __table_args__ = (CheckConstraint("parent_id IS NULL OR parent_id <> id", name="folder_not_self"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    name: Mapped[str] = mapped_column(String(120))
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("folders.id"), index=True)
+
+
+class Favorite(Base):
+    __tablename__ = "document_favorites"
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class DocumentVersion(Base):

@@ -284,3 +284,160 @@ def test_rate_limit_and_request_body_cap(database, monkeypatch):
         "/api/v1/auth/login", content=b"x" * (1024 * 1024 + 9), headers={"content-type": "application/json"}
     )
     assert response.status_code == 413
+
+
+def test_dms_folders_trash_favorites_revision_restore_diff(database):
+    c, stranger = client(), client("stranger")
+    root = c.post("/api/v1/folders", json={"name": "Root"}).json()
+    child = c.post("/api/v1/folders", json={"name": "Child", "parent_id": root["id"]}).json()
+    assert (
+        c.patch("/api/v1/folders/" + root["id"], json={"name": "Root", "parent_id": child["id"]}).status_code
+        == 409
+    )
+    assert stranger.get("/api/v1/folders/" + root["id"] + "/breadcrumbs").status_code == 404
+    assert len(c.get("/api/v1/folders/" + child["id"] + "/breadcrumbs").json()) == 2
+    d = create(c)
+    base = "/api/v1/documents/" + d["id"]
+    moved = c.post(base + "/move", json={"folder_id": child["id"], "expected_revision": d["revision"]})
+    assert moved.status_code == 200, moved.text
+    d = moved.json()
+    assert c.patch(base, json={"title": "stale", "expected_revision": 1}).status_code == 409
+    assert c.put(base + "/favorite").status_code == 204
+    assert c.put(base + "/favorite").status_code == 204
+    assert d["id"] in [x["id"] for x in c.get("/api/v1/documents?view=favorites").json()["items"]]
+    assert stranger.put(base + "/favorite").status_code == 404
+    v1 = c.post(base + "/versions", files={"file": ("a.txt", b"first\n", "text/plain")}).json()
+    v2 = c.post(base + "/versions", files={"file": ("b.txt", b"second\n", "text/plain")}).json()
+    assert "-first" in c.get(base + "/versions/" + v1["id"] + "/diff/" + v2["id"]).json()["diff"]
+    assert stranger.get(base + "/versions/" + v1["id"] + "/diff/" + v2["id"]).status_code == 404
+    d = c.get(base).json()
+    result = c.post(base + "/versions/" + v1["id"] + "/restore", json={"expected_revision": d["revision"]})
+    assert result.status_code == 201, result.text
+    v3 = result.json()
+    assert v3["version_number"] == 3 and v3["sha256"] == v1["sha256"]
+    assert c.get(base + "/versions/" + v2["id"] + "/download").content == b"second\n"
+    assert c.get(base + "/versions/" + v3["id"] + "/download").content == b"first\n"
+    d = c.get(base).json()
+    deleted = c.post(base + "/trash", json={"expected_revision": d["revision"]}).json()
+    assert deleted["deleted_at"]
+    assert d["id"] not in [x["id"] for x in c.get("/api/v1/documents").json()["items"]]
+    assert d["id"] in [x["id"] for x in c.get("/api/v1/documents?view=trash").json()["items"]]
+    assert c.patch(base, json={"title": "no"}).status_code == 409
+    assert c.post(base + "/comments", json={"body": "no"}).status_code == 409
+    assert c.post(base + "/transitions", json={"action": "submit"}).status_code == 409
+    assert (
+        stranger.post(base + "/restore", json={"expected_revision": deleted["revision"]}).status_code == 404
+    )
+    restored = c.post(base + "/restore", json={"expected_revision": deleted["revision"]})
+    assert restored.status_code == 200 and restored.json()["deleted_at"] is None
+    assert {"DOCUMENT_TRASHED", "DOCUMENT_RESTORED", "VERSION_RESTORED", "DOCUMENT_MOVED"} <= {
+        x["action"] for x in c.get(base + "/activity").json()
+    }
+
+
+def test_concurrent_folder_moves_cannot_create_cycle(database):
+    c = client()
+    roots = [c.post("/api/v1/folders", json={"name": name}).json() for name in ("A", "B")]
+    token, csrf = c.cookies.get("nexora_session"), c.headers["x-csrf-token"]
+
+    def move(i):
+        new = TestClient(app)
+        new.cookies.set("nexora_session", token)
+        new.headers.update({"origin": settings().web_origin, "x-csrf-token": csrf})
+        return new.patch(
+            "/api/v1/folders/" + roots[i]["id"],
+            json={"name": roots[i]["name"], "parent_id": roots[1 - i]["id"]},
+        ).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(move, range(2)))
+    assert sorted(results) == [200, 409]
+
+
+def test_admin_document_types_and_server_custom_field_validation(database):
+    admin, c = client("admin"), client()
+    payload = {
+        "code": "CUSTOM_CONTRACT",
+        "name_ru": "Договор",
+        "name_en": "Contract",
+        "fields": [
+            {
+                "key": "amount",
+                "name_ru": "Сумма",
+                "name_en": "Amount",
+                "kind": "number",
+                "required": True,
+                "minimum": 0,
+            },
+            {
+                "key": "currency",
+                "name_ru": "Валюта",
+                "name_en": "Currency",
+                "kind": "select",
+                "options": ["KZT", "USD"],
+                "default": "KZT",
+            },
+            {"key": "date", "name_ru": "Дата", "name_en": "Date", "kind": "date"},
+            {"key": "url", "name_ru": "Ссылка", "name_en": "Link", "kind": "URL"},
+            {"key": "person", "name_ru": "Ответственный", "name_en": "Responsible", "kind": "user"},
+        ],
+    }
+    assert c.post("/api/v1/document-types", json=payload).status_code == 403
+    response = admin.post("/api/v1/document-types", json=payload)
+    assert response.status_code == 201, response.text
+    type_id = response.json()["id"]
+    assert admin.post("/api/v1/document-types", json=payload).status_code == 409
+
+    def create_custom(values):
+        return c.post(
+            "/api/v1/documents", json={"title": "Contract", "type_id": type_id, "business_metadata": values}
+        )
+
+    for values in (
+        {},
+        {"amount": -1},
+        {"amount": True},
+        {"amount": 1, "currency": "EUR"},
+        {"amount": 1, "date": "bad"},
+        {"amount": 1, "url": "javascript:alert(1)"},
+        {"amount": 1, "person": "missing"},
+        {"amount": 1, "unknown": 2},
+    ):
+        assert create_custom(values).status_code == 422, values
+    result = create_custom({"amount": 150, "date": "2026-10-07", "person": "owner"})
+    assert result.status_code == 201 and result.json()["business_metadata"]["currency"] == "KZT"
+    base = "/api/v1/documents/" + result.json()["id"]
+    assert c.patch(base, json={"title": "Contract", "business_metadata": {}}).status_code == 422
+    assert c.patch("/api/v1/document-types/" + type_id, json=payload).status_code == 403
+    payload["fields"][0]["enabled"] = False
+    assert admin.patch("/api/v1/document-types/" + type_id, json=payload).status_code == 200
+    assert create_custom({}).status_code == 201
+    payload["fields"].append(payload["fields"][0])
+    assert admin.post("/api/v1/document-types", json=payload).status_code == 422
+
+
+def test_structured_metadata_dates_and_references(database):
+    c = client()
+    response = c.post(
+        "/api/v1/documents",
+        json={
+            "title": "Metadata",
+            "type_id": "type",
+            "description": "Description",
+            "category": "Policy",
+            "tags": ["finance", "2026"],
+            "responsible_id": "owner",
+            "confidentiality": "CONFIDENTIAL",
+            "effective_date": "2026-10-01",
+            "expiration_date": "2026-12-01",
+        },
+    )
+    assert response.status_code == 201, response.text
+    doc = response.json()
+    assert doc["tags"] == ["finance", "2026"] and doc["confidentiality"] == "CONFIDENTIAL"
+    base = "/api/v1/documents/" + doc["id"]
+    assert c.patch(base, json={"title": "Metadata", "expiration_date": "2026-01-01"}).status_code == 422
+    assert c.patch(base, json={"title": "Metadata", "responsible_id": "missing"}).status_code == 422
+    assert c.patch(base, json={"title": "Metadata", "tags": ["a", "a"]}).status_code == 422
+    response = c.patch(base, json={"title": "Metadata renamed", "expected_revision": doc["revision"]})
+    assert response.status_code == 200 and response.json()["description"] == "Description"

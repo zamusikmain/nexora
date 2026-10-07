@@ -13,6 +13,7 @@ from app import auth, catalog, documents
 from app.body_limit import BodyLimit
 from app.config import settings
 from app.db import SessionLocal
+from app.dms import router as dms_router
 
 app = FastAPI(
     title="NEXORA",
@@ -90,3 +91,6 @@ def ready() -> dict:
 
 for router in (auth.router, documents.router, catalog.router):
     app.include_router(router, prefix="/api/v1")
+
+
+app.include_router(dms_router, prefix="/api/v1")

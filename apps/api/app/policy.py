@@ -43,5 +43,7 @@ def can_read(user: User, doc: Document) -> bool:
 def require_write(user: User, doc: Document) -> None:
     if doc.owner_id != user.id and "admin" not in PERMISSIONS[user.role]:
         raise HTTPException(403, "forbidden")
+    if doc.deleted_at is not None:
+        raise HTTPException(409, "document_in_trash")
     if doc.status not in {"DRAFT", "REVISION_REQUIRED"}:
         raise HTTPException(409, "document_not_editable")

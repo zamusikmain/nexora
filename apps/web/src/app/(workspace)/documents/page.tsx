@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { Catalog, DocumentList } from "@/lib/types";
+import { Catalog, DocumentList, Folder } from "@/lib/types";
 import { useI18n } from "@/components/provider";
 import { DocumentTable, ErrorBox } from "@/components/common";
 const statuses = [
@@ -18,11 +18,17 @@ const statuses = [
 ];
 export default function Page() {
   const { t, lang } = useI18n();
+  const [folderId, setFolderId] = useState("");
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [crumbs, setCrumbs] = useState<Folder[]>([]);
+  const [folderRefresh, setFolderRefresh] = useState(0);
+  const [folderBusy, setFolderBusy] = useState(false);
   const [data, setData] = useState<DocumentList | null>(null);
   const [types, setTypes] = useState<Catalog[]>([]);
   const [departments, setDepartments] = useState<Catalog[]>([]);
   const [error, setError] = useState("");
   const [filters, setFilters] = useState({
+    view: "all",
     q: "",
     status: "",
     type_id: "",
@@ -44,7 +50,11 @@ export default function Page() {
   }, []);
   useEffect(() => {
     let active = true;
-    const params = new URLSearchParams({ ...filters, page: String(page) });
+    const params = new URLSearchParams({
+      ...filters,
+      folder_id: folderId,
+      page: String(page),
+    });
     api<DocumentList>(`/documents?${params}`)
       .then((value) => {
         if (active) {
@@ -61,7 +71,61 @@ export default function Page() {
     return () => {
       active = false;
     };
-  }, [filters, page]);
+  }, [filters, page, folderId]);
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      api<Folder[]>(`/folders${folderId ? `?parent_id=${folderId}` : ""}`),
+      folderId
+        ? api<Folder[]>(`/folders/${folderId}/breadcrumbs`)
+        : Promise.resolve([]),
+    ])
+      .then(([f, c]) => {
+        if (active) {
+          setFolders(f);
+          setCrumbs(c);
+        }
+      })
+      .catch((e) => {
+        if (active) setError(e instanceof ApiError ? e.code : "error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [folderId, folderRefresh]);
+  function navigateFolder(id: string) {
+    setBusy(true);
+    setPage(1);
+    setFolderId(id);
+  }
+  async function saveFolder(
+    e: React.FormEvent<HTMLFormElement>,
+    edit: boolean,
+  ) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const values = new FormData(form);
+    setFolderBusy(true);
+    setError("");
+    try {
+      await api(edit ? `/folders/${folderId}` : "/folders", {
+        method: edit ? "PATCH" : "POST",
+        body: JSON.stringify({
+          name: values.get("name"),
+          parent_id: edit
+            ? String(values.get("parent_id") || "") || null
+            : folderId || null,
+        }),
+      });
+      setFolderRefresh((x) => x + 1);
+      form.reset();
+      if (edit) navigateFolder(String(values.get("parent_id") || ""));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.code : "error");
+    } finally {
+      setFolderBusy(false);
+    }
+  }
   function filter(key: string, value: string) {
     setBusy(true);
     setPage(1);
@@ -79,7 +143,76 @@ export default function Page() {
         </Link>
       </div>
       <section className="panel">
+        <h2>{t("folders")}</h2>
+        <nav aria-label={t("folders")} className="actions">
+          <button onClick={() => navigateFolder("")}>{t("rootFolder")}</button>
+          {crumbs.map((f) => (
+            <button key={f.id} onClick={() => navigateFolder(f.id)}>
+              {f.name}
+            </button>
+          ))}
+        </nav>
+        <div className="actions">
+          {folders.map((f) => (
+            <button key={f.id} onClick={() => navigateFolder(f.id)}>
+              {f.name}
+            </button>
+          ))}
+        </div>
+        <details>
+          <summary>{t("newFolder")}</summary>
+          <form onSubmit={(e) => saveFolder(e, false)}>
+            <label>
+              {t("folderName")}
+              <input name="name" required maxLength={120} />
+            </label>
+            <button disabled={folderBusy}>{t("save")}</button>
+          </form>
+        </details>
+        {folderId && (
+          <details>
+            <summary>{t("renameMoveFolder")}</summary>
+            <form key={folderId} onSubmit={(e) => saveFolder(e, true)}>
+              <label>
+                {t("folderName")}
+                <input
+                  name="name"
+                  required
+                  defaultValue={crumbs.at(-1)?.name}
+                  maxLength={120}
+                />
+              </label>
+              <label>
+                {t("parentFolder")}
+                <select name="parent_id" defaultValue={crumbs.at(-2)?.id || ""}>
+                  <option value="">{t("rootFolder")}</option>
+                  {crumbs.slice(0, -1).map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button disabled={folderBusy}>{t("save")}</button>
+            </form>
+          </details>
+        )}
+      </section>
+      <section className="panel">
         <div className="filters">
+          <label>
+            {t("view")}
+            <select
+              value={filters.view}
+              onChange={(e) => filter("view", e.target.value)}
+            >
+              {["all", "my", "favorites", "archive", "trash"].map((v) => (
+                <option key={v} value={v}>
+                  {t(`view_${v}`)}
+                </option>
+              ))}
+            </select>
+          </label>
           <form
             onSubmit={(e) => {
               e.preventDefault();

@@ -24,3 +24,22 @@ Base /api/v1. Mutations require exact WEB_ORIGIN; authenticated mutations also r
 
 No empty workflow/approval/AI endpoints. Search is GET /documents.
 Lifecycle: DRAFT/REVISION_REQUIRED -> SUBMITTED (requires file); DRAFT/SUBMITTED/REVISION_REQUIRED -> CANCELLED; CANCELLED/APPROVED/REJECTED -> ARCHIVED. Reserved future statuses cannot be directly set. Invalid transition 409; unsupported action/input 422.
+
+
+## DMS increment (2026-10-07)
+- GET /folders?parent_id= — visible direct children (bounded 200).
+- POST /folders — name, optional parent_id. Private namespace of the actor.
+- PATCH /folders/{id} — rename/move, owner or admin; cycle/depth checks.
+- GET /folders/{id}/breadcrumbs — authorized ancestry.
+- GET /documents adds view=all|my|favorites|archive|trash and folder_id. All results remain policy filtered and server paginated.
+- POST /documents/{id}/move — folder_id, expected_revision.
+- PUT/DELETE /documents/{id}/favorite — idempotent actor-specific favorites.
+- POST /documents/{id}/trash and /restore — expected_revision; owner/admin, audited.
+- POST /documents/{id}/versions/{version_id}/restore — expected_revision, creates new immutable version and blob.
+- GET /documents/{id}/versions/{version_id}/diff/{other_id} — authorized bounded TXT unified diff (256KiB/2000 lines each).
+- POST /document-types and PATCH /document-types/{id} — admin only; bilingual labels and up to 50 validated declarative fields. Existing type GET includes metadata_schema.fields.
+- Document create/update now supports description, category, tags (30 x 50 chars), responsible_id, confidentiality, effective_date, expiration_date. Owner, department and lifecycle remain server controlled. Classification labels do not grant access.
+- Document responses include folder_id, deleted_at and revision. New UI metadata writes send expected_revision; stale writes return 409 stale_document. Legacy PATCH without revision remains accepted for compatibility and is a known release limitation.
+- Custom fields support text, textarea, number, date, timezone-aware datetime, boolean, select, multi-select, user, department, HTTP(S) URL; required/default/order/options/enabled/range/length. User/department references must exist; responsible user must be active. Dates must be ordered. No arbitrary regex, expression execution or URL fetching.
+- Removing field keys from used types is rejected: disable fields to preserve historical values. Disabled historical values are retained.
+- No physical purge endpoint is implemented; immutable versions and audit retain their protections.

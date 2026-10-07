@@ -41,6 +41,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ...(user?.role === "ADMIN"
       ? [
           ["/admin/users", "users"],
+          ["/admin/document-types", "documentTypes"],
           ["/admin/audit", "audit"],
         ]
       : []),

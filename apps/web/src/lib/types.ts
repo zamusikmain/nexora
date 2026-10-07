@@ -6,13 +6,44 @@ export type User = {
   status: string;
   department_id: string | null;
 };
+export type CustomField = {
+  key: string;
+  name_ru: string;
+  name_en: string;
+  kind: string;
+  required: boolean;
+  enabled: boolean;
+  default: unknown;
+  options: string[];
+  order: number;
+  minimum: number | null;
+  maximum: number | null;
+  max_length: number;
+};
 export type Catalog = {
+  metadata_schema?: { fields?: CustomField[] };
   id: string;
   code: string;
   name_ru: string;
   name_en: string;
 };
+export type Folder = {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  owner_id: string;
+};
 export type Document = {
+  description: string;
+  category: string;
+  tags: string[];
+  responsible_id: string | null;
+  confidentiality: string;
+  effective_date: string | null;
+  expiration_date: string | null;
+  folder_id: string | null;
+  deleted_at: string | null;
+  revision: number;
   id: string;
   number: string;
   title: string;

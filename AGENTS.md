@@ -1,5 +1,5 @@
 # NEXORA
-Document management portfolio project; optional AI is future work. Current scope: Iteration 1 only. Never commit or push without explicit instruction.
+Document management portfolio project; optional AI is future work. Current work: incremental enterprise development following the user’s 2026-10-07 request. The user explicitly authorized a baseline and small logical commits; push only if a remote is configured.
 ## Architecture
 Modular monolith: apps/api (FastAPI, SQLAlchemy, Alembic), apps/web (Next.js/TypeScript), PostgreSQL, private local storage. No MCP, AI, workers or workflow engine in Iteration 1.
 ## Invariants
@@ -16,4 +16,4 @@ Migrations: docker compose exec api alembic upgrade head
 Use typed schemas, small modules, explicit transactions, safe error codes. Update docs with implementation. Full workflow/approvals and notifications belong to Iteration 2. See docs/iterations.md and docs/security.md.
 
 ## Verified state
-Iteration 1 implemented; 16 PostgreSQL/unit cases and 2 localization tests. See docs/verification.md for exact checks and limitations. Docker uses pinned requirements.lock and package-lock.json; web standalone runtime excludes dev tooling. Example .env uses default ports; prepared local .env uses 3300/8800/55432 because existing apps occupied defaults. Production setup and future workflows remain planned. No commit/push.
+Iteration 1 implemented; 16 PostgreSQL/unit cases and 2 localization tests. See docs/verification.md for exact checks and limitations. Docker uses pinned requirements.lock and package-lock.json; web standalone runtime excludes dev tooling. Example .env uses default ports; prepared local .env uses 3300/8800/55432 because existing apps occupied defaults. Production setup and future workflows remain planned. Baseline is committed; see Git history.

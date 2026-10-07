@@ -50,3 +50,7 @@ Iteration 2: versioned workflows, assignments, sequential approve/reject/revisio
 
 ## Документация
 [Architecture](docs/architecture.md), [Product](docs/product.md), [Security](docs/security.md), [Iterations](docs/iterations.md), [Data model](docs/data-model.md), [API](docs/api.md), [Verification](docs/verification.md), [Agent guide](AGENTS.md).
+
+
+### DMS increment
+Private nested folders with breadcrumbs and move operations; All/My/Favorites/Archive/Trash views; audited soft delete and restore; immutable old-version restore as a new version; bounded UTF-8 TXT comparison; structured document metadata; administrator-defined types and validated custom fields with generated RU/EN document forms. New migrations append after Iteration 1. See docs/api.md, docs/decisions.md and docs/verification.md. Physical purge, shared resource ACL and the later enterprise phases remain planned; this does not establish production readiness.

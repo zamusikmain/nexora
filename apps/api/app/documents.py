@@ -8,13 +8,24 @@ from sqlalchemy import func, or_, select
 
 from app.audit import audit
 from app.auth import Actor, Db
-from app.models import AuditEvent, Comment, Document, DocumentType, DocumentVersion, number_sequence
+from app.custom_fields import validate_metadata
+from app.models import (
+    AuditEvent,
+    Comment,
+    Document,
+    DocumentType,
+    DocumentVersion,
+    Favorite,
+    User,
+    number_sequence,
+)
 from app.policy import can_read, require, require_write, visibility
 from app.schemas import (
     CommentCreate,
     CommentOut,
     DocumentCreate,
     DocumentListOut,
+    DocumentMetadata,
     DocumentOut,
     DocumentUpdate,
     Transition,
@@ -27,7 +38,22 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 def document_data(doc: Document) -> dict[str, Any]:
     return {
+        **{
+            key: getattr(doc, key)
+            for key in (
+                "description",
+                "category",
+                "tags",
+                "responsible_id",
+                "confidentiality",
+                "effective_date",
+                "expiration_date",
+            )
+        },
         "id": doc.id,
+        "folder_id": doc.folder_id,
+        "deleted_at": doc.deleted_at,
+        "revision": doc.revision,
         "number": doc.number,
         "title": doc.title,
         "type_id": doc.type_id,
@@ -56,13 +82,26 @@ def list_documents(
     db: Db,
     user: Actor,
     q: str = Query("", max_length=240),
+    view: str = Query("all", pattern="^(all|my|favorites|archive|trash)$"),
+    folder_id: str | None = None,
     status: str | None = None,
     type_id: str | None = None,
     department_id: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
 ) -> dict:
-    conditions = [visibility(user)]
+    conditions = [
+        visibility(user),
+        Document.deleted_at.is_not(None) if view == "trash" else Document.deleted_at.is_(None),
+    ]
+    if view == "my":
+        conditions.append(Document.owner_id == user.id)
+    elif view == "favorites":
+        conditions.append(Document.id.in_(select(Favorite.document_id).where(Favorite.user_id == user.id)))
+    elif view == "archive":
+        conditions.append(Document.status == "ARCHIVED")
+    if folder_id:
+        conditions.append(Document.folder_id == folder_id)
     if q:
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         conditions.append(
@@ -89,19 +128,41 @@ def list_documents(
     return {"items": [document_data(d) for d in docs], "total": total, "page": page}
 
 
+def metadata_values(body, db: Db) -> dict:
+    values = body.model_dump(
+        include={
+            "description",
+            "category",
+            "tags",
+            "responsible_id",
+            "confidentiality",
+            "effective_date",
+            "expiration_date",
+        }
+    )
+    if values["responsible_id"]:
+        responsible = db.get(User, values["responsible_id"])
+        if responsible is None or responsible.status != "ACTIVE":
+            raise HTTPException(422, "invalid_responsible")
+    return values
+
+
 @router.post("", status_code=201, response_model=DocumentOut)
 def create_document(body: DocumentCreate, request: Request, db: Db, user: Actor) -> dict:
     require(user, "create")
-    if not db.get(DocumentType, body.type_id):
+    doc_type = db.get(DocumentType, body.type_id)
+    if not doc_type:
         raise HTTPException(422, "invalid_document_type")
+    metadata = metadata_values(body, db)
     sequence = db.scalar(number_sequence.next_value())
     doc = Document(
+        **metadata,
         number=f"DOC-{datetime.now(UTC).year}-{sequence:06d}",
         title=body.title,
         type_id=body.type_id,
         owner_id=user.id,
         department_id=user.department_id,
-        business_metadata=body.business_metadata,
+        business_metadata=validate_metadata(doc_type.metadata_schema, body.business_metadata, db),
     )
     db.add(doc)
     db.flush()
@@ -119,7 +180,25 @@ def read_document(doc_id: str, db: Db, user: Actor) -> dict:
 def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db, user: Actor) -> dict:
     doc = get_document(db, user, doc_id, lock=True)
     require_write(user, doc)
-    doc.title, doc.business_metadata = body.title, body.business_metadata
+    if body.expected_revision is not None and body.expected_revision != doc.revision:
+        raise HTTPException(409, "stale_document")
+    doc_type = db.get(DocumentType, doc.type_id)
+    if doc_type is None:
+        raise HTTPException(422, "invalid_document_type")
+    supplied = metadata_values(body, db)
+    merged = {key: supplied[key] if key in body.model_fields_set else getattr(doc, key) for key in supplied}
+    try:
+        DocumentMetadata.model_validate(merged)
+    except ValueError:
+        raise HTTPException(422, "invalid_dates") from None
+    for key, value in supplied.items():
+        if key in body.model_fields_set:
+            setattr(doc, key, value)
+    doc.revision += 1
+    doc.title, doc.business_metadata = (
+        body.title,
+        validate_metadata(doc_type.metadata_schema, body.business_metadata, db),
+    )
     audit(db, request, user.id, "DOCUMENT_UPDATED", "document", doc.id)
     db.commit()
     return document_data(doc)
@@ -130,6 +209,8 @@ def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Ac
     doc = get_document(db, user, doc_id, lock=True)
     if doc.owner_id != user.id and user.role != "ADMIN":
         raise HTTPException(403, "forbidden")
+    if doc.deleted_at is not None:
+        raise HTTPException(409, "document_in_trash")
     targets = {
         "submit": ({"DRAFT", "REVISION_REQUIRED"}, "SUBMITTED"),
         "cancel": ({"DRAFT", "SUBMITTED", "REVISION_REQUIRED"}, "CANCELLED"),
@@ -140,6 +221,7 @@ def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Ac
         raise HTTPException(409, "invalid_transition")
     if body.action == "submit" and not doc.current_version_id:
         raise HTTPException(409, "file_required")
+    doc.revision += 1
     previous, doc.status = doc.status, target
     audit(
         db,
@@ -216,13 +298,15 @@ def upload_version(
         db.add(version)
         db.flush()
         doc.current_version_id = version.id
+        doc.revision += 1
         doc.updated_at = datetime.now(UTC)
         audit(db, request, user.id, "FILE_UPLOADED", "document", doc.id, {"version": last + 1})
         audit(db, request, user.id, "VERSION_CREATED", "document", doc.id, {"version_id": version.id})
         db.commit()
     except Exception:
         db.rollback()
-        store.delete(saved.key)
+        # A lost commit acknowledgement can leave a committed version. Keep the blob
+        # until a DB-confirmed orphan sweep; deleting here could destroy valid data.
         raise
     return version_data(version)
 
@@ -279,7 +363,7 @@ def comments(doc_id: str, db: Db, user: Actor) -> list[dict]:
 def comment(doc_id: str, body: CommentCreate, request: Request, db: Db, user: Actor) -> dict:
     doc = get_document(db, user, doc_id, lock=True)
     require(user, "comment")
-    if doc.status == "ARCHIVED":
+    if doc.status == "ARCHIVED" or doc.deleted_at is not None:
         raise HTTPException(409, "document_not_editable")
     c = Comment(document_id=doc_id, author_id=user.id, body=body.body)
     db.add(c)

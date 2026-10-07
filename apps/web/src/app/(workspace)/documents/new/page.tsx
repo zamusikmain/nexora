@@ -5,11 +5,19 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { Catalog, Document } from "@/lib/types";
 import { useI18n } from "@/components/provider";
+import { CustomFields, collectCustomFields } from "@/components/custom-fields";
+import {
+  DocumentMetadata,
+  collectMetadata,
+} from "@/components/document-metadata";
 import { ErrorBox } from "@/components/common";
 export default function Page() {
   const { t, lang } = useI18n();
   const router = useRouter();
   const [types, setTypes] = useState<Catalog[]>([]);
+  const [typeId, setTypeId] = useState("");
+  const selected = types.find((x) => x.id === (typeId || types[0]?.id));
+  const fields = selected?.metadata_schema?.fields || [];
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -22,7 +30,9 @@ export default function Page() {
     const form = new FormData(e.currentTarget);
     let metadata;
     try {
-      metadata = JSON.parse(String(form.get("metadata")));
+      metadata = fields.length
+        ? collectCustomFields(form, fields)
+        : JSON.parse(String(form.get("metadata")));
       if (!metadata || Array.isArray(metadata) || typeof metadata !== "object")
         throw Error();
     } catch {
@@ -38,6 +48,7 @@ export default function Page() {
           title: form.get("title"),
           type_id: form.get("type_id"),
           business_metadata: metadata,
+          ...collectMetadata(form),
         }),
       });
       router.push(`/documents/${doc.id}`);
@@ -61,7 +72,12 @@ export default function Page() {
           </label>
           <label>
             {t("type")}
-            <select name="type_id" required>
+            <select
+              name="type_id"
+              required
+              value={typeId || types[0]?.id || ""}
+              onChange={(e) => setTypeId(e.target.value)}
+            >
               {types.map((item) => (
                 <option key={item.id} value={item.id}>
                   {lang === "ru" ? item.name_ru : item.name_en}
@@ -69,16 +85,21 @@ export default function Page() {
               ))}
             </select>
           </label>
-          <label>
-            {t("metadata")}
-            <textarea
-              name="metadata"
-              defaultValue="{}"
-              rows={7}
-              maxLength={16384}
-              className="mono"
-            />
-          </label>
+          <DocumentMetadata />
+          {fields.length ? (
+            <CustomFields key={selected?.id} fields={fields} />
+          ) : (
+            <label>
+              {t("metadata")}
+              <textarea
+                name="metadata"
+                defaultValue="{}"
+                rows={7}
+                maxLength={16384}
+                className="mono"
+              />
+            </label>
+          )}
           <ErrorBox code={error} />
           <button className="primary" disabled={busy || !types.length}>
             {t(busy ? "loading" : "create")}

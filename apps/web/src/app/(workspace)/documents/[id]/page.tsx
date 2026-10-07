@@ -6,6 +6,12 @@ import { api, ApiError } from "@/lib/api";
 import { Activity, Catalog, Comment, Document, Version } from "@/lib/types";
 import { useI18n } from "@/components/provider";
 import { useUser } from "@/components/shell";
+import { CustomFields, collectCustomFields } from "@/components/custom-fields";
+import { DmsActions } from "@/components/dms-actions";
+import {
+  DocumentMetadata,
+  collectMetadata,
+} from "@/components/document-metadata";
 import { Badge, ErrorBox } from "@/components/common";
 export default function Page() {
   const { id } = useParams<{ id: string }>();
@@ -50,9 +56,13 @@ export default function Page() {
       })
       .catch((e) => setError(e instanceof ApiError ? e.code : "error"));
   }, [id]);
+  const fields =
+    types.find((x) => x.id === doc?.type_id)?.metadata_schema?.fields || [];
   const owner = doc && (doc.owner_id === user?.id || user?.role === "ADMIN");
   const editable =
-    owner && ["DRAFT", "REVISION_REQUIRED"].includes(doc?.status || "");
+    owner &&
+    !doc?.deleted_at &&
+    ["DRAFT", "REVISION_REQUIRED"].includes(doc?.status || "");
   async function mutate(path: string, options: RequestInit) {
     setBusy(true);
     setError("");
@@ -96,7 +106,9 @@ export default function Page() {
     const data = new FormData(e.currentTarget);
     let metadata;
     try {
-      metadata = JSON.parse(String(data.get("metadata")));
+      metadata = fields.length
+        ? collectCustomFields(data, fields, doc?.business_metadata)
+        : JSON.parse(String(data.get("metadata")));
       if (!metadata || Array.isArray(metadata) || typeof metadata !== "object")
         throw Error();
     } catch {
@@ -109,6 +121,8 @@ export default function Page() {
         body: JSON.stringify({
           title: data.get("title"),
           business_metadata: metadata,
+          ...collectMetadata(data),
+          expected_revision: doc?.revision,
         }),
       })
     )
@@ -145,6 +159,7 @@ export default function Page() {
                   </button>
                 )}
                 {owner &&
+                  !doc.deleted_at &&
                   ["DRAFT", "REVISION_REQUIRED"].includes(doc.status) && (
                     <button
                       className="primary"
@@ -155,6 +170,7 @@ export default function Page() {
                     </button>
                   )}
                 {owner &&
+                  !doc.deleted_at &&
                   ["DRAFT", "SUBMITTED", "REVISION_REQUIRED"].includes(
                     doc.status,
                   ) && (
@@ -166,6 +182,7 @@ export default function Page() {
                     </button>
                   )}
                 {owner &&
+                  !doc.deleted_at &&
                   ["CANCELLED", "APPROVED", "REJECTED"].includes(
                     doc.status,
                   ) && (
@@ -178,6 +195,12 @@ export default function Page() {
                   )}
               </div>
             </div>
+            <DmsActions
+              doc={doc}
+              versions={versions}
+              busy={busy}
+              mutate={mutate}
+            />
             <section className="panel">
               <h2>{t("overview")}</h2>
               {editing ? (
@@ -191,19 +214,27 @@ export default function Page() {
                       maxLength={240}
                     />
                   </label>
-                  <label>
-                    {t("metadata")}
-                    <textarea
-                      name="metadata"
-                      defaultValue={JSON.stringify(
-                        doc.business_metadata,
-                        null,
-                        2,
-                      )}
-                      rows={6}
-                      maxLength={16384}
+                  <DocumentMetadata doc={doc} />
+                  {fields.length ? (
+                    <CustomFields
+                      fields={fields}
+                      values={doc.business_metadata}
                     />
-                  </label>
+                  ) : (
+                    <label>
+                      {t("metadata")}
+                      <textarea
+                        name="metadata"
+                        defaultValue={JSON.stringify(
+                          doc.business_metadata,
+                          null,
+                          2,
+                        )}
+                        rows={6}
+                        maxLength={16384}
+                      />
+                    </label>
+                  )}
                   <button disabled={busy} className="primary">
                     {t("save")}
                   </button>
@@ -231,6 +262,29 @@ export default function Page() {
                     <div>
                       <dt>{t("registered")}</dt>
                       <dd>{new Date(doc.created_at).toLocaleString(lang)}</dd>
+                    </div>
+                  </dl>
+                  <p>{doc.description}</p>
+                  <dl className="details">
+                    <div>
+                      <dt>{t("category")}</dt>
+                      <dd>{doc.category}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("tags")}</dt>
+                      <dd>{doc.tags.join(", ")}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("confidentiality")}</dt>
+                      <dd>{t(doc.confidentiality)}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("effectiveDate")}</dt>
+                      <dd>{doc.effective_date}</dd>
+                    </div>
+                    <div>
+                      <dt>{t("expirationDate")}</dt>
+                      <dd>{doc.expiration_date}</dd>
                     </div>
                   </dl>
                   <h3>{t("metadata")}</h3>
@@ -304,7 +358,7 @@ export default function Page() {
                 ) : (
                   <p>{t("empty")}</p>
                 )}
-                {doc.status !== "ARCHIVED" && (
+                {!doc.deleted_at && doc.status !== "ARCHIVED" && (
                   <form onSubmit={comment}>
                     <label>
                       {t("comment")}
