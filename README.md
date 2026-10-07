@@ -40,13 +40,12 @@ npm run build
 Integration tests принимают только БД nexora_test и очищают только её таблицы. Без NEXORA_TEST_DATABASE_URL они явно skipped; unit tests работают. Не используйте рабочую БД.
 Локальный backend: `python -m venv .venv`, `.venv\Scripts\python -m pip install -r requirements.lock`, `.venv\Scripts\python -m pip install --no-deps -e .`; DATABASE_URL и STORAGE_ROOT задаются окружением. Для frontend вне Docker API_INTERNAL_URL задайте **до npm run build**: rewrite фиксируется при сборке.
 
-## PLANNED
-Iteration 2: versioned workflows, assignments, sequential approve/reject/revision with reasons, deadlines и internal notifications. Затем optional AI/providers/parsing/pgvector/permission-aware RAG. Эти функции не реализованы.
+## Enterprise increment
+Implemented: private folders, favorites/archive/trash views, audited restore, custom document types and structured metadata, immutable version restoration/TXT diff; versioned sequential/parallel/conditional workflows with deadlines and idempotent decisions; real ClamAV quarantine/scanning and legacy attestations; session inventory/revocation; safe operator cleanup; backup with isolated restore verification.
 
-## LIMITATIONS
-Не production certification. Development HTTP и примерные credentials требуют замены для эксплуатации. Нет регистрации/password reset, UI создания пользователей и управления справочниками. REVIEWER/APPROVER/LEGAL имеют owner-level access до появления workflow assignments. Approve/reject/revision actions отсутствуют, прямое изменение status запрещено.
-Нет antivirus, полноценной проверки PDF/DOCX или content disarm. Crash между file write и DB commit может оставить orphan; reconciliation/backups/retention отсутствуют. Metadata editing без optimistic concurrency token, последняя запись выигрывает. Comments ограничены 500, activity 200, admin users 500; documents/audit paginated. Нет фоновой очистки sessions/throttle rows. Reverse proxy объединяет peer rate limit; нужен production rate-limit design.
-Нет уведомлений, realtime, advanced workflow, AI, MCP или внешних интеграций. Полные результаты и предупреждения dependency audit: docs/verification.md.
+Run with antivirus: `docker compose -f compose.yaml -f compose.security.yaml up -d --build`. See [Deployment](docs/deployment.md), [Security](docs/security.md), [Backup/restore](docs/backup-restore.md), [Workflow policy](docs/workflows.md) and [current verification](docs/verification.md).
+
+Commercial scope remains incomplete: no MFA/SSO, granular ACL/revocation, groups/hierarchy, tasks/notifications, AI, advanced search/exports, external integrations, tenants or large benchmark. Legacy metadata PATCH without revision is still accepted for compatibility. Workflow participants retain related document read access. This is a working enterprise foundation, not a production release certification.
 
 ## Документация
 [Architecture](docs/architecture.md), [Product](docs/product.md), [Security](docs/security.md), [Iterations](docs/iterations.md), [Data model](docs/data-model.md), [API](docs/api.md), [Verification](docs/verification.md), [Agent guide](AGENTS.md).
