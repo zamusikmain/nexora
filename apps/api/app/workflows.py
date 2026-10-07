@@ -14,8 +14,17 @@ from sqlalchemy.exc import IntegrityError
 
 from app.audit import audit
 from app.auth import Actor, Db
-from app.documents import get_document
-from app.models import Approval, Department, Document, User, WorkflowEvent, WorkflowInstance, WorkflowTemplate
+from app.documents import get_document, require_scan
+from app.models import (
+    Approval,
+    Department,
+    Document,
+    DocumentVersion,
+    User,
+    WorkflowEvent,
+    WorkflowInstance,
+    WorkflowTemplate,
+)
 from app.policy import require
 from app.schemas import Input
 
@@ -322,6 +331,9 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
         raise HTTPException(409, "invalid_transition")
     if not doc.current_version_id:
         raise HTTPException(409, "file_required")
+    file_version = db.get(DocumentVersion, doc.current_version_id)
+    assert file_version is not None
+    require_scan(file_version, db)
     template = db.get(WorkflowTemplate, body.template_id)
     if template is None:
         raise HTTPException(422, "invalid_workflow_template")

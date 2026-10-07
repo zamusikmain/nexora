@@ -15,7 +15,9 @@ services:
       timeout: 5s
       retries: 20
   api:
-    build: ./apps/api
+    build:
+      context: ./apps/api
+      target: development
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nexora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nexora}
       APP_ENV: ${APP_ENV:-development}
@@ -23,6 +25,9 @@ services:
       STORAGE_ROOT: /data/uploads
       SEED_DEMO: ${SEED_DEMO:-false}
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      MALWARE_SCANNER: ${MALWARE_SCANNER:-disabled-development}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:
@@ -36,6 +41,11 @@ services:
       timeout: 5s
       retries: 20
   web:
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/login').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     build: ./apps/web
     environment:
       API_INTERNAL_URL: http://api:8000

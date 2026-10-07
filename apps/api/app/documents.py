@@ -1,3 +1,4 @@
+import hashlib
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
@@ -8,6 +9,7 @@ from sqlalchemy import func, or_, select
 
 from app.audit import audit
 from app.auth import Actor, Db
+from app.config import settings
 from app.custom_fields import validate_metadata
 from app.models import (
     AuditEvent,
@@ -16,6 +18,7 @@ from app.models import (
     DocumentType,
     DocumentVersion,
     Favorite,
+    FileScan,
     User,
     number_sequence,
 )
@@ -222,6 +225,10 @@ def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Ac
     states, target = targets[body.action]
     if doc.status not in states:
         raise HTTPException(409, "invalid_transition")
+    if body.action == "submit" and doc.current_version_id:
+        current = db.get(DocumentVersion, doc.current_version_id)
+        assert current is not None
+        require_scan(current, db)
     if body.action == "submit" and not doc.current_version_id:
         raise HTTPException(409, "file_required")
     doc.revision += 1
@@ -279,7 +286,12 @@ def upload_version(
     doc = get_document(db, user, doc_id, lock=True)
     require_write(user, doc)
     store = storage()
-    saved = store.save(file)
+    try:
+        saved = store.save(file)
+    except HTTPException as error:
+        audit(db, request, user.id, "FILE_UPLOAD_BLOCKED", "document", doc.id, {"reason": error.detail})
+        db.commit()
+        raise
     try:
         last = (
             db.scalar(
@@ -300,6 +312,8 @@ def upload_version(
         )
         db.add(version)
         db.flush()
+        if saved.scanned_by:
+            db.add(FileScan(version_id=version.id, sha256=version.sha256, engine=saved.scanned_by))
         doc.current_version_id = version.id
         doc.revision += 1
         doc.updated_at = datetime.now(UTC)
@@ -322,11 +336,22 @@ def download(doc_id: str, version_id: str, request: Request, db: Db, user: Actor
     )
     if not version:
         raise HTTPException(404, "not_found")
+    require_scan(version, db)
     try:
         file = storage().open(version.storage_key)
     except FileNotFoundError:
         raise HTTPException(503, "file_unavailable") from None
     try:
+        checksum = hashlib.sha256()
+        read_size = 0
+        while chunk := file.read(64 * 1024):
+            read_size += len(chunk)
+            if read_size > version.size:
+                raise HTTPException(503, "file_unavailable")
+            checksum.update(chunk)
+        if read_size != version.size or checksum.hexdigest() != version.sha256:
+            raise HTTPException(503, "file_unavailable")
+        file.seek(0)
         audit(db, request, user.id, "FILE_DOWNLOADED", "document", doc_id, {"version_id": version_id})
         db.commit()
     except Exception:
@@ -394,3 +419,10 @@ def activity(doc_id: str, db: Db, user: Actor) -> list[dict]:
             .limit(200)
         )
     ]
+
+
+def require_scan(version: DocumentVersion, db: Db) -> None:
+    if settings().app_env == "production":
+        record = db.get(FileScan, version.id)
+        if record is None or record.sha256 != version.sha256 or record.engine != "clamav":
+            raise HTTPException(503, "file_scan_required")

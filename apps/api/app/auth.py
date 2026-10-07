@@ -6,7 +6,7 @@ from typing import Annotated
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.audit import audit
 from app.config import settings
 from app.db import get_db
 from app.models import AuthSession, LoginThrottle, User
+from app.policy import require
 from app.schemas import Login, SessionOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -98,11 +99,25 @@ def login(body: Login, request: Request, response: Response, db: Db) -> dict:
     db.add(
         AuthSession(
             id=digest(token),
+            user_agent="".join(c for c in request.headers.get("user-agent", "") if c.isprintable())[:200],
             user_id=user.id,
             csrf_token=csrf,
             expires_at=now + timedelta(hours=settings().session_hours),
         )
     )
+    db.flush()
+    excess = list(
+        db.scalars(
+            select(AuthSession)
+            .where(AuthSession.user_id == user.id, AuthSession.expires_at > now)
+            .order_by(AuthSession.created_at.desc(), AuthSession.id)
+            .offset(20)
+        )
+    )
+    for expired in excess:
+        db.delete(expired)
+    if excess:
+        audit(db, request, user.id, "SESSIONS_PRUNED", "user", user.id, {"count": len(excess)})
     audit(db, request, user.id, "USER_LOGIN", "user", user.id)
     db.commit()
     response.set_cookie(
@@ -128,3 +143,65 @@ def logout(request: Request, response: Response, user: Actor, db: Db) -> None:
     audit(db, request, user.id, "USER_LOGOUT", "user", user.id)
     db.commit()
     response.delete_cookie("nexora_session", path="/")
+
+
+@router.get("/sessions")
+def sessions(request: Request, db: Db, user: Actor) -> list[dict]:
+    current = request.state.auth_session.id
+    return [
+        {
+            "id": s.public_id,
+            "user_agent": s.user_agent,
+            "created_at": s.created_at,
+            "expires_at": s.expires_at,
+            "current": s.id == current,
+        }
+        for s in db.scalars(
+            select(AuthSession)
+            .where(AuthSession.user_id == user.id, AuthSession.expires_at > datetime.now(UTC))
+            .order_by(AuthSession.created_at.desc())
+            .limit(20)
+        )
+    ]
+
+
+@router.post("/sessions/revoke-others", status_code=204)
+def revoke_others(request: Request, db: Db, user: Actor):
+    deleted = db.scalars(
+        delete(AuthSession)
+        .where(AuthSession.user_id == user.id, AuthSession.id != request.state.auth_session.id)
+        .returning(AuthSession.public_id)
+    ).all()
+    audit(db, request, user.id, "SESSIONS_REVOKED", "user", user.id, {"count": len(deleted)})
+    db.commit()
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def revoke_session(session_id: str, request: Request, response: Response, db: Db, user: Actor):
+    row = db.scalar(
+        select(AuthSession)
+        .where(AuthSession.public_id == session_id, AuthSession.user_id == user.id)
+        .with_for_update()
+    )
+    if row is None:
+        raise HTTPException(404, "not_found")
+    current = row.id == request.state.auth_session.id
+    db.delete(row)
+    audit(db, request, user.id, "SESSION_REVOKED", "user", user.id, {"current": current})
+    db.commit()
+    if current:
+        response.delete_cookie("nexora_session", path="/")
+
+
+@router.post("/users/{user_id}/sessions/revoke", status_code=204)
+def admin_revoke_sessions(user_id: str, request: Request, response: Response, db: Db, user: Actor):
+    require(user, "admin")
+    if db.get(User, user_id) is None:
+        raise HTTPException(404, "not_found")
+    deleted = db.scalars(
+        delete(AuthSession).where(AuthSession.user_id == user_id).returning(AuthSession.public_id)
+    ).all()
+    audit(db, request, user.id, "SESSIONS_REVOKED", "user", user_id, {"count": len(deleted)})
+    db.commit()
+    if user_id == user.id:
+        response.delete_cookie("nexora_session", path="/")

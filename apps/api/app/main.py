@@ -97,3 +97,11 @@ for router in (auth.router, documents.router, catalog.router):
 app.include_router(dms_router, prefix="/api/v1")
 
 app.include_router(workflows_router, prefix="/api/v1")
+
+
+@app.get("/api/v1/capabilities")
+def capabilities(user: auth.Actor):
+    return {
+        "malware_scanning": settings().malware_scanner,
+        "development": settings().app_env == "development",
+    }

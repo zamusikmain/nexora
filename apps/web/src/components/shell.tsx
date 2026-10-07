@@ -39,6 +39,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ["/dashboard", "dashboard"],
     ["/documents", "documents"],
     ["/approvals", "approvals"],
+    ["/settings/security", "securitySessions"],
     ...(user?.role === "ADMIN"
       ? [
           ["/admin/users", "users"],

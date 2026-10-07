@@ -1,6 +1,7 @@
 """DMS operations preserve version and audit history."""
 
 import difflib
+import hashlib
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
@@ -10,8 +11,8 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.audit import audit
 from app.auth import Actor, Db
-from app.documents import document_data, get_document, version_data
-from app.models import DocumentVersion, Favorite, Folder
+from app.documents import document_data, get_document, require_scan, version_data
+from app.models import DocumentVersion, Favorite, FileScan, Folder
 from app.policy import require_write
 from app.schemas import Input
 from app.storage import storage
@@ -241,6 +242,8 @@ def restore_version(
     )
     db.add(version)
     db.flush()
+    if saved.scanned_by:
+        db.add(FileScan(version_id=version.id, sha256=version.sha256, engine=saved.scanned_by))
     doc.current_version_id = version.id
     doc.revision += 1
     doc.updated_at = datetime.now(UTC)
@@ -269,12 +272,16 @@ def diff(doc_id: str, version_id: str, other_id: str, request: Request, db: Db, 
             raise HTTPException(404, "not_found")
         if version.mime_type != "text/plain" or version.size > 256 * 1024:
             raise HTTPException(422, "diff_unsupported")
+        require_scan(version, db)
         versions.append(version)
     contents = []
     try:
         for version in versions:
             with storage().open(version.storage_key) as file:
-                contents.append(file.read(256 * 1024 + 1).decode("utf-8").splitlines(keepends=True))
+                raw = file.read(256 * 1024 + 1)
+                if hashlib.sha256(raw).hexdigest() != version.sha256:
+                    raise HTTPException(503, "file_unavailable")
+                contents.append(raw.decode("utf-8").splitlines(keepends=True))
     except (FileNotFoundError, UnicodeError):
         raise HTTPException(503, "file_unavailable") from None
     # Bound CPU on adversarial text; never hand arbitrary binary files to parsers.

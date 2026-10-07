@@ -1,0 +1,23 @@
+# Optional development scan service; production must use clamav mode.
+services:
+  api:
+    environment:
+      MALWARE_SCANNER: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+    depends_on:
+      clamav:
+        condition: service_healthy
+  clamav:
+    image: clamav/clamav@sha256:ebec5bc138401b36ae987caa1a3fa3c3b2a21ed3d51f0bfa5852825e663e67b0
+    restart: unless-stopped
+    volumes:
+      - clamav_signatures:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "1"]
+      interval: 15s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+volumes:
+  clamav_signatures:

@@ -618,3 +618,84 @@ def test_workflow_revision_rejection_cancel_conditions_and_concurrency(database)
         == "REJECTED"
     )
     assert owner.get(base).json()["status"] == "REJECTED"
+
+
+def test_scan_quarantine_fail_closed_attestation_and_legacy_download(database, monkeypatch):
+    from fastapi import HTTPException
+    from sqlalchemy.exc import DBAPIError
+
+    from app import storage as store_module
+    from app.models import FileScan
+
+    c = client()
+    doc = create(c)
+    base = "/api/v1/documents/" + doc["id"]
+
+    class BrokenScanner:
+        def scan(self, path):
+            raise HTTPException(503, "scanner_unavailable")
+
+    monkeypatch.setattr(store_module, "scanner", lambda: BrokenScanner())
+    result = c.post(base + "/versions", files={"file": ("blocked.txt", b"safe", "text/plain")})
+    assert result.status_code == 503
+    assert c.get(base + "/versions").json() == []
+    assert not list(settings().storage_root.glob(".quarantine-*"))
+    assert "FILE_UPLOAD_BLOCKED" in {a["action"] for a in c.get(base + "/activity").json()}
+
+    # A successful scanner result is recorded separately from immutable version content.
+    class CleanScanner:
+        def scan(self, path):
+            pass
+
+    monkeypatch.setattr(store_module, "scanner", lambda: CleanScanner())
+    monkeypatch.setattr(settings(), "malware_scanner", "clamav")
+    version = c.post(base + "/versions", files={"file": ("scanned.txt", b"verified", "text/plain")}).json()
+    with database() as db:
+        record = db.get(FileScan, version["id"])
+        assert record and record.sha256 == version["sha256"]
+        for statement in [
+            "UPDATE file_scans SET engine='changed' WHERE version_id=:id",
+            "DELETE FROM file_scans WHERE version_id=:id",
+        ]:
+            with pytest.raises(DBAPIError):
+                db.execute(text(statement), {"id": version["id"]})
+                db.commit()
+            db.rollback()
+
+    monkeypatch.setattr(settings(), "app_env", "production")
+    assert c.get(base + "/versions/" + version["id"] + "/download").content == b"verified"
+    from app.models import DocumentVersion
+
+    with database() as db:
+        row = db.get(DocumentVersion, version["id"])
+        assert row
+        path = store_module.storage().path(row.storage_key)
+    path.write_bytes(b"corrupted")
+    assert c.get(base + "/versions/" + version["id"] + "/download").status_code == 503
+    path.write_bytes(b"verified")
+
+    monkeypatch.setattr(settings(), "app_env", "development")
+    monkeypatch.setattr(settings(), "malware_scanner", "disabled-development")
+    version = c.post(base + "/versions", files={"file": ("legacy.txt", b"legacy", "text/plain")}).json()
+    monkeypatch.setattr(settings(), "app_env", "production")
+    assert c.get(base + "/versions/" + version["id"] + "/download").status_code == 503
+    assert c.post(base + "/transitions", json={"action": "submit"}).status_code == 503
+
+
+def test_session_inventory_scoping_revocation_and_admin(database):
+    a, b, stranger, admin = client(), client(), client("stranger"), client("admin")
+    rows = a.get("/api/v1/auth/sessions").json()
+    assert rows and all("csrf_token" not in s and len(s["id"]) == 36 for s in rows)
+    assert sum(s["current"] for s in rows) == 1
+    foreign = stranger.get("/api/v1/auth/sessions").json()[0]["id"]
+    assert a.delete("/api/v1/auth/sessions/" + foreign).status_code == 404
+    assert a.post("/api/v1/auth/sessions/revoke-others").status_code == 204
+    assert b.get("/api/v1/auth/me").status_code == 401
+    assert a.get("/api/v1/auth/me").status_code == 200
+    assert stranger.post("/api/v1/auth/users/owner/sessions/revoke").status_code == 403
+    assert admin.post("/api/v1/auth/users/owner/sessions/revoke").status_code == 204
+    assert a.get("/api/v1/auth/me").status_code == 401
+    a = client()
+    current = next(x for x in a.get("/api/v1/auth/sessions").json() if x["current"])
+    assert a.delete("/api/v1/auth/sessions/" + current["id"]).status_code == 204
+    assert a.get("/api/v1/auth/me").status_code == 401

@@ -61,6 +61,9 @@ class User(Timestamped, Base):
 
 class AuthSession(Base):
     __tablename__ = "auth_sessions"
+    __table_args__ = (UniqueConstraint("public_id", name="uq_auth_session_public_id"),)
+    public_id: Mapped[str] = mapped_column(String(36), default=uid)
+    user_agent: Mapped[str] = mapped_column(String(200), default="", server_default="")
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     csrf_token: Mapped[str] = mapped_column(String(64))
@@ -268,4 +271,12 @@ class WorkflowEvent(Base):
     new_state: Mapped[str] = mapped_column(String(30))
     idempotency_key: Mapped[str] = mapped_column(String(36))
     request_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FileScan(Base):
+    __tablename__ = "file_scans"
+    version_id: Mapped[str] = mapped_column(ForeignKey("document_versions.id"), primary_key=True)
+    sha256: Mapped[str] = mapped_column(String(64))
+    engine: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

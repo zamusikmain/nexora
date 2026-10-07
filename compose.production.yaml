@@ -1,0 +1,32 @@
+# Use together with compose.yaml AND compose.security.yaml, behind an HTTPS reverse proxy.
+services:
+  db:
+    restart: unless-stopped
+  api:
+    build:
+      target: production
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    environment:
+      APP_ENV: production
+      SEED_DEMO: "false"
+      DEMO_PASSWORD: ""
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: ./apps/api
+      target: production
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nexora}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-nexora}
+      APP_ENV: production
+      WEB_ORIGIN: ${WEB_ORIGIN:?Set public HTTPS origin}
+      MALWARE_SCANNER: clamav
+      SEED_DEMO: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    restart: unless-stopped

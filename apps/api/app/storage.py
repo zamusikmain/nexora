@@ -10,6 +10,7 @@ from typing import BinaryIO, Protocol
 from fastapi import HTTPException, UploadFile
 
 from app.config import settings
+from app.scanning import scanner
 
 
 @dataclass
@@ -19,6 +20,7 @@ class StoredFile:
     mime: str
     size: int
     sha256: str
+    scanned_by: str | None = None
 
 
 class Storage(Protocol):
@@ -63,8 +65,9 @@ class LocalStorage:
         if upload.content_type not in {allowed[ext], "application/octet-stream"}:
             raise HTTPException(422, "invalid_file_type")
         key, size, sha = uuid.uuid4().hex, 0, hashlib.sha256()
+        quarantine = self.root / (".quarantine-" + key)
         try:
-            with self.path(key).open("xb") as out:
+            with quarantine.open("xb") as out:
                 while chunk := upload.file.read(64 * 1024):
                     size += len(chunk)
                     if size > settings().max_upload_bytes:
@@ -73,11 +76,20 @@ class LocalStorage:
                     out.write(chunk)
             if size == 0:
                 raise HTTPException(422, "empty_file")
-            self.validate(self.path(key), ext)
+            self.validate(quarantine, ext)
+            scanner().scan(quarantine)
+            quarantine.replace(self.path(key))
         except Exception:
-            self.delete(key)
+            quarantine.unlink(missing_ok=True)
             raise
-        return StoredFile(key, name, allowed[ext], size, sha.hexdigest())
+        return StoredFile(
+            key,
+            name,
+            allowed[ext],
+            size,
+            sha.hexdigest(),
+            "clamav" if settings().malware_scanner == "clamav" else None,
+        )
 
     @staticmethod
     def validate(path: Path, ext: str) -> None:

@@ -18,6 +18,12 @@ export default function Page() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
   const user = useUser();
+  const [scanner, setScanner] = useState("");
+  useEffect(() => {
+    api<{ malware_scanning: string }>("/capabilities")
+      .then((x) => setScanner(x.malware_scanning))
+      .catch(() => setScanner("unknown"));
+  }, []);
   const [doc, setDoc] = useState<Document | null>(null);
   const [versions, setVersions] = useState<Version[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -325,6 +331,15 @@ export default function Page() {
               ))}
               {editable && (
                 <form className="upload-form" onSubmit={upload}>
+                  <p role="status">
+                    {t(
+                      scanner === "clamav"
+                        ? "scanEnabled"
+                        : scanner === "disabled-development"
+                          ? "scanDisabled"
+                          : "scanUnknown",
+                    )}
+                  </p>
                   <label>
                     {t("file")}
                     <input
