@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -187,3 +188,84 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class WorkflowTemplate(Base):
+    __tablename__ = "workflow_templates"
+    __table_args__ = (
+        UniqueConstraint("code", "version", name="uq_workflow_template_version"),
+        CheckConstraint("version > 0", name="workflow_template_positive"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    code: Mapped[str] = mapped_column(String(40), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    name_ru: Mapped[str] = mapped_column(String(120))
+    name_en: Mapped[str] = mapped_column(String(120))
+    definition: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WorkflowInstance(Base):
+    __tablename__ = "workflow_instances"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('RUNNING','APPROVED','REJECTED','REVISION_REQUIRED','CANCELLED')",
+            name="workflow_status",
+        ),
+        ForeignKeyConstraint(
+            ["document_id", "document_version_id"],
+            ["document_versions.document_id", "document_versions.id"],
+            name="fk_workflow_document_version",
+        ),
+        Index(
+            "uq_workflow_active_document",
+            "document_id",
+            unique=True,
+            postgresql_where=text("status = 'RUNNING'"),
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
+    document_version_id: Mapped[str] = mapped_column(String(36))
+    template_id: Mapped[str] = mapped_column(ForeignKey("workflow_templates.id"))
+    metadata_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
+    stage: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(30), default="RUNNING")
+    started_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Approval(Base):
+    __tablename__ = "approvals"
+    __table_args__ = (
+        UniqueConstraint("instance_id", "stage", "user_id", name="uq_approval_assignee"),
+        CheckConstraint(
+            "status IN ('WAITING','PENDING','APPROVED','REJECTED','REVISION_REQUIRED','CANCELLED')",
+            name="approval_status",
+        ),
+        Index("ix_approvals_user_status_due", "user_id", "status", "due_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    instance_id: Mapped[str] = mapped_column(ForeignKey("workflow_instances.id"), index=True)
+    stage: Mapped[int] = mapped_column(Integer)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(30))
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WorkflowEvent(Base):
+    __tablename__ = "workflow_events"
+    __table_args__ = (UniqueConstraint("actor_id", "idempotency_key", name="uq_workflow_actor_request"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    instance_id: Mapped[str] = mapped_column(ForeignKey("workflow_instances.id"), index=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    action: Mapped[str] = mapped_column(String(30))
+    comment: Mapped[str] = mapped_column(String(2000))
+    previous_state: Mapped[str] = mapped_column(String(30))
+    new_state: Mapped[str] = mapped_column(String(30))
+    idempotency_key: Mapped[str] = mapped_column(String(36))
+    request_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

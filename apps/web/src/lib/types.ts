@@ -87,3 +87,53 @@ export type Dashboard = {
   by_type: Record<string, number>;
   recent: Document[];
 };
+
+export type WorkflowStage = {
+  name_ru: string;
+  name_en: string;
+  selector: string;
+  targets: string[];
+  due_hours: number;
+  require_comment: boolean;
+  conditions: { field: string; op: string; value: unknown }[];
+};
+export type WorkflowTemplate = {
+  id: string;
+  code: string;
+  version: number;
+  name_ru: string;
+  name_en: string;
+  stages: WorkflowStage[];
+};
+export type WorkflowInstance = {
+  id: string;
+  document_id: string;
+  document_version_id: string;
+  status: string;
+  stage: number;
+  template: WorkflowTemplate;
+  created_at: string;
+  completed_at: string | null;
+  approvals: {
+    id: string;
+    user_id: string;
+    display_name: string;
+    stage: number;
+    status: string;
+    due_at: string | null;
+    acted_at: string | null;
+    name_ru: string;
+    name_en: string;
+    mine: boolean;
+  }[];
+  events: {
+    id: string;
+    actor_id: string;
+    display_name: string;
+    action: string;
+    comment: string;
+    previous_state: string;
+    new_state: string;
+    created_at: string;
+  }[];
+};

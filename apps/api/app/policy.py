@@ -1,8 +1,8 @@
 from fastapi import HTTPException
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 from sqlalchemy.sql.elements import ColumnElement
 
-from app.models import Document, User
+from app.models import Approval, Document, User, WorkflowInstance
 
 PERMISSIONS = {
     "USER": {"create", "comment"},
@@ -22,7 +22,13 @@ def require(user: User, permission: str) -> None:
 def visibility(user: User) -> ColumnElement[bool]:
     if "all_read" in PERMISSIONS[user.role]:
         return Document.id.is_not(None)
-    own = Document.owner_id == user.id
+    assigned = (
+        select(Approval.id)
+        .join(WorkflowInstance, Approval.instance_id == WorkflowInstance.id)
+        .where(Approval.user_id == user.id, WorkflowInstance.document_id == Document.id)
+        .exists()
+    )
+    own = or_(Document.owner_id == user.id, assigned)
     if "department_read" in PERMISSIONS[user.role] and user.department_id:
         return or_(own, Document.department_id == user.department_id)
     return own

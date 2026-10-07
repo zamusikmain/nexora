@@ -72,7 +72,10 @@ def get_document(db: Db, user: Actor, doc_id: str, lock: bool = False) -> Docume
     if lock:
         query = query.with_for_update()
     doc = db.scalar(query)
-    if not doc or not can_read(user, doc):
+    if not doc or (
+        not can_read(user, doc)
+        and not db.scalar(select(Document.id).where(Document.id == doc_id, visibility(user)))
+    ):
         raise HTTPException(404, "not_found")
     return doc
 

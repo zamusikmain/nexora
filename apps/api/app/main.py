@@ -14,6 +14,7 @@ from app.body_limit import BodyLimit
 from app.config import settings
 from app.db import SessionLocal
 from app.dms import router as dms_router
+from app.workflows import router as workflows_router
 
 app = FastAPI(
     title="NEXORA",
@@ -94,3 +95,5 @@ for router in (auth.router, documents.router, catalog.router):
 
 
 app.include_router(dms_router, prefix="/api/v1")
+
+app.include_router(workflows_router, prefix="/api/v1")

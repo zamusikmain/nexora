@@ -441,3 +441,180 @@ def test_structured_metadata_dates_and_references(database):
     assert c.patch(base, json={"title": "Metadata", "tags": ["a", "a"]}).status_code == 422
     response = c.patch(base, json={"title": "Metadata renamed", "expected_revision": doc["revision"]})
     assert response.status_code == 200 and response.json()["description"] == "Description"
+
+
+def workflow_template(admin, code="QA_FLOW", parallel=False, conditions=None):
+    stages = [
+        {
+            "name_ru": "Проверка",
+            "name_en": "Review",
+            "selector": "user",
+            "targets": ["manager", "legal"] if parallel else ["manager"],
+            "require_comment": True,
+            "due_hours": 24,
+        }
+    ]
+    if conditions is not None:
+        stages[0]["conditions"] = conditions
+    stages.append(
+        {"name_ru": "Согласование", "name_en": "Approval", "selector": "user", "targets": ["admin"]}
+    )
+    response = admin.post(
+        "/api/v1/workflow-templates",
+        json={"code": code, "name_ru": "Маршрут", "name_en": "Route", "stages": stages},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_workflow_parallel_snapshots_bola_and_idempotency(database):
+    import uuid
+
+    from sqlalchemy.exc import DBAPIError
+
+    from app.models import WorkflowInstance
+
+    owner, admin, manager, legal, stranger = (
+        client(),
+        client("admin"),
+        client("manager"),
+        client("legal"),
+        client("stranger"),
+    )
+    template = workflow_template(admin, parallel=True)
+    doc = create(owner)
+    base = "/api/v1/documents/" + doc["id"]
+    version = owner.post(
+        base + "/versions", files={"file": ("wf.txt", b"Approval version", "text/plain")}
+    ).json()
+    doc = owner.get(base).json()
+    key = str(uuid.uuid4())
+    payload = {"template_id": template["id"], "expected_revision": doc["revision"], "idempotency_key": key}
+    assert stranger.post(base + "/workflows", json=payload).status_code == 404
+    response = owner.post(base + "/workflows", json=payload)
+    assert response.status_code == 201, response.text
+    instance = response.json()
+    wf = "/api/v1/workflows/" + instance["id"] + "/decisions"
+    assert owner.post(base + "/workflows", json=payload).json()["id"] == instance["id"]
+    assert legal.get(base).status_code == 200
+    assert legal.get(base + "/versions/" + version["id"] + "/download").content == b"Approval version"
+    assert stranger.get(base).status_code == 404
+    assert stranger.get(base + "/workflows").status_code == 404
+    assert (
+        stranger.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 404
+    )
+    assert owner.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 403
+    assert admin.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 403
+    assert (
+        manager.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 422
+    )
+    # Creating a new template version does not alter the bound instance.
+    changed = workflow_template(admin, parallel=False)
+    assert changed["version"] == 2
+    loaded = owner.get(base + "/workflows").json()[0]
+    assert loaded["template"]["version"] == 1 and len(loaded["approvals"]) == 3
+    assert owner.patch(base, json={"title": "no"}).status_code == 409
+    decision = {"action": "approve", "comment": "Reviewed", "idempotency_key": str(uuid.uuid4())}
+    response = manager.post(wf, json=decision)
+    assert response.status_code == 200 and response.json()["stage"] == 0
+    assert manager.post(wf, json=decision).status_code == 200
+    assert manager.post(wf, json={**decision, "comment": "Different"}).status_code == 409
+    assert manager.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).status_code == 403
+    assert legal.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).json()["stage"] == 1
+    assert admin.get("/api/v1/approvals").json()["total"] >= 1
+    final = admin.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())})
+    assert final.status_code == 200 and final.json()["status"] == "APPROVED"
+    assert owner.get(base).json()["status"] == "APPROVED"
+    assert len(final.json()["events"]) == 4
+    with database() as db:
+        saved = db.get(WorkflowInstance, instance["id"])
+        assert saved.metadata_snapshot["metadata"]["amount"] == 100
+    for sql in [
+        "UPDATE workflow_templates SET name_en='forged' WHERE id=:id",
+        "DELETE FROM workflow_templates WHERE id=:id",
+    ]:
+        with pytest.raises(DBAPIError), database.begin() as db:
+            db.execute(text(sql), {"id": template["id"]})
+    with pytest.raises(DBAPIError), database.begin() as db:
+        db.execute(
+            text("UPDATE workflow_instances SET metadata_snapshot='{}' WHERE id=:id"), {"id": instance["id"]}
+        )
+    with pytest.raises(DBAPIError), database.begin() as db:
+        db.execute(
+            text("UPDATE workflow_events SET comment='forged' WHERE instance_id=:id"), {"id": instance["id"]}
+        )
+
+
+def test_workflow_revision_rejection_cancel_conditions_and_concurrency(database):
+    import uuid
+
+    owner, admin, manager = client(), client("admin"), client("manager")
+    template = workflow_template(
+        admin, code="CONDITIONAL", conditions=[{"field": "metadata.amount", "op": "gte", "value": 1000}]
+    )
+    doc = create(owner)
+    base = "/api/v1/documents/" + doc["id"]
+    owner.post(base + "/versions", files={"file": ("flow.txt", b"v1", "text/plain")})
+
+    def start(template_id):
+        current = owner.get(base).json()
+        r = owner.post(
+            base + "/workflows",
+            json={
+                "template_id": template_id,
+                "expected_revision": current["revision"],
+                "idempotency_key": str(uuid.uuid4()),
+            },
+        )
+        assert r.status_code == 201, r.text
+        return r.json()
+
+    instance = start(template["id"])
+    assert instance["stage"] == 1 and len(instance["approvals"]) == 1
+    wf = "/api/v1/workflows/" + instance["id"] + "/decisions"
+    assert owner.post(wf, json={"action": "cancel", "idempotency_key": str(uuid.uuid4())}).status_code == 422
+    assert (
+        owner.post(
+            wf, json={"action": "cancel", "comment": "Cancelled", "idempotency_key": str(uuid.uuid4())}
+        ).json()["status"]
+        == "CANCELLED"
+    )
+    # New document: return to revision, resubmit, then race two decisions.
+    doc = create(owner)
+    base = "/api/v1/documents/" + doc["id"]
+    owner.post(base + "/versions", files={"file": ("flow.txt", b"v1", "text/plain")})
+    regular = workflow_template(admin, code="REVISION_FLOW")
+    instance = start(regular["id"])
+    wf = "/api/v1/workflows/" + instance["id"] + "/decisions"
+    assert (
+        manager.post(
+            wf, json={"action": "revision", "comment": "Correct amount", "idempotency_key": str(uuid.uuid4())}
+        ).json()["status"]
+        == "REVISION_REQUIRED"
+    )
+    assert (
+        owner.patch(base, json={"title": "Corrected", "business_metadata": {"amount": 200}}).status_code
+        == 200
+    )
+    instance = start(regular["id"])
+    wf = "/api/v1/workflows/" + instance["id"] + "/decisions"
+    token, csrf = manager.cookies.get("nexora_session"), manager.headers["x-csrf-token"]
+    key = str(uuid.uuid4())
+
+    def approve(_):
+        c = TestClient(app)
+        c.cookies.set("nexora_session", token)
+        c.headers.update({"origin": settings().web_origin, "x-csrf-token": csrf})
+        return c.post(wf, json={"action": "approve", "comment": "Checked", "idempotency_key": key})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(approve, range(2)))
+    assert [r.status_code for r in results] == [200, 200]
+    assert len(owner.get(base + "/workflows").json()[0]["events"]) == 2
+    assert (
+        admin.post(
+            wf, json={"action": "reject", "comment": "Rejected", "idempotency_key": str(uuid.uuid4())}
+        ).json()["status"]
+        == "REJECTED"
+    )
+    assert owner.get(base).json()["status"] == "REJECTED"

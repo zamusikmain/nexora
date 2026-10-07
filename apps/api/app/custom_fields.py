@@ -81,7 +81,7 @@ def validate_value(field: CustomField, value: Any, db: Session | None) -> None:
     elif kind == "boolean":
         valid = isinstance(value, bool)
     elif kind == "number":
-        valid = type(value) in {int, float} and math.isfinite(value)
+        valid = type(value) is int or (type(value) is float and math.isfinite(value))
         if valid and field.minimum is not None:
             valid = value >= field.minimum
         if valid and field.maximum is not None:

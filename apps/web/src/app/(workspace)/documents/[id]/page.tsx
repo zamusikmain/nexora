@@ -7,6 +7,7 @@ import { Activity, Catalog, Comment, Document, Version } from "@/lib/types";
 import { useI18n } from "@/components/provider";
 import { useUser } from "@/components/shell";
 import { CustomFields, collectCustomFields } from "@/components/custom-fields";
+import { Workflow } from "@/components/workflow";
 import { DmsActions } from "@/components/dms-actions";
 import {
   DocumentMetadata,
@@ -195,6 +196,7 @@ export default function Page() {
                   )}
               </div>
             </div>
+            <Workflow doc={doc} busy={busy} mutate={mutate} />
             <DmsActions
               doc={doc}
               versions={versions}

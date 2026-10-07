@@ -38,10 +38,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const links = [
     ["/dashboard", "dashboard"],
     ["/documents", "documents"],
+    ["/approvals", "approvals"],
     ...(user?.role === "ADMIN"
       ? [
           ["/admin/users", "users"],
           ["/admin/document-types", "documentTypes"],
+          ["/admin/workflows", "workflows"],
           ["/admin/audit", "audit"],
         ]
       : []),
