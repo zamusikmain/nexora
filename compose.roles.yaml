@@ -1,0 +1,20 @@
+# Explicit opt-in only, after compose.production.yaml if used. Provision roles first.
+services:
+  api:
+    command: ["sh", "-c", "python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://nexora_runtime:${DB_RUNTIME_PASSWORD_URLENCODED:?Provide encoded runtime secret}@db:5432/${POSTGRES_DB:-nexora}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  migrate:
+    build:
+      context: ./apps/api
+      target: production
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://nexora_migrations:${DB_MIGRATIONS_PASSWORD_URLENCODED:?Provide encoded migrations secret}@db:5432/${POSTGRES_DB:-nexora}
+      SEED_DEMO: "false"
+    depends_on:
+      db:
+        condition: service_healthy

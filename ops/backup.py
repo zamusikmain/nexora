@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -38,7 +39,36 @@ def safe_location(path):
     return path
 
 
-def backup(destination):
+def dump_command(*, legacy_admin=False):
+    if legacy_admin:
+        return 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl -Fc'
+    # TCP prevents local trust authentication from bypassing the backup password.
+    return (
+        ': "${DB_BACKUP_PASSWORD:?Dedicated backup credential is required}"; '
+        '[ "${DB_BACKUP_USER:-}" = nexora_backup ] || exit 1; '
+        'PGPASSWORD="$DB_BACKUP_PASSWORD" pg_dump -h 127.0.0.1 --no-password '
+        '-U "$DB_BACKUP_USER" -d "$POSTGRES_DB" --no-owner --no-acl -Fc'
+    )
+
+
+def storage_archive_script(path):
+    return f"""from pathlib import Path
+import re,tarfile
+root=Path('/data/uploads')
+with tarfile.open({path!r},'w:gz') as archive:
+ for path in root.iterdir():
+  if re.fullmatch('[a-f0-9]{{32}}',path.name) and path.is_file() and not path.is_symlink():
+   archive.add(path,arcname=path.name,recursive=False)
+"""
+
+
+def dump_environment_args(*, legacy_admin=False):
+    if not legacy_admin and os.environ.get("DB_BACKUP_PASSWORD"):
+        return ["-e", "DB_BACKUP_PASSWORD", "-e", "DB_BACKUP_USER=nexora_backup"]
+    return []
+
+
+def backup(destination, *, legacy_admin=False):
     destination = safe_location(destination)
     destination.mkdir(parents=True, exist_ok=False)
     db, api = service_id("db"), service_id("api")
@@ -46,26 +76,23 @@ def backup(destination):
     db_tmp = f"/tmp/nexora-{suffix}.dump"
     storage_tmp = f"/tmp/nexora-{suffix}.tar.gz"
     # Dump first: referenced immutable blobs already exist before version commits.
+    # Inject a secret from the operator process without recreating the DB container.
+    # Docker reads the value from the environment; no password appears in command arguments.
+    backup_env = dump_environment_args(legacy_admin=legacy_admin)
     run(
         [
             "docker",
             "exec",
+            *backup_env,
             db,
             "sh",
             "-c",
-            'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl -Fc -f ' + db_tmp,
+            dump_command(legacy_admin=legacy_admin) + " -f " + db_tmp,
         ]
     )
     run(["docker", "cp", f"{db}:{db_tmp}", str(destination / "database.dump")])
     # Only validated private key-shaped files; no symlinks, directories or config secrets.
-    script = f"""from pathlib import Path
-import re,tarfile
-root=Path('/data/uploads')
-with tarfile.open({storage_tmp!r},'w:gz') as archive:
- for path in root.iterdir():
-  if re.fullmatch('[a-f0-9]{32}',path.name) and path.is_file() and not path.is_symlink():
-   archive.add(path,arcname=path.name,recursive=False)
-"""
+    script = storage_archive_script(storage_tmp)
     run(["docker", "exec", api, "python", "-c", script])
     run(["docker", "cp", f"{api}:{storage_tmp}", str(destination / "storage.tar.gz")])
     for file in ["compose.yaml", ".env.example"]:
@@ -204,9 +231,11 @@ if __name__ == "__main__":
     parser.add_argument("action", choices=["backup", "verify"])
     parser.add_argument("directory", type=Path)
     parser.add_argument("--database")
+    parser.add_argument("--legacy-admin-dump", action="store_true",
+                        help="Explicit pre-cutover backup only; uses the old operator account")
     args = parser.parse_args()
     if args.action == "backup":
-        backup(args.directory)
+        backup(args.directory, legacy_admin=args.legacy_admin_dump)
     elif args.database:
         verify(args.directory, args.database)
     else:

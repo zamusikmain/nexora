@@ -1,5 +1,9 @@
 # Backup and isolated recovery
 
+Dedicated backup role is prepared; see `database-roles.md`. Normal backup now requires `DB_BACKUP_PASSWORD` in the operator environment (the utility injects nexora_backup and its password into pg_dump without recreating PostgreSQL) and uses TCP password authentication. It never silently falls back to the administrator. Until approved cutover, the existing stack requires the explicit `--legacy-admin-dump` flag for an operator backup. Restore verification uses the operator account to create a NEW database; backup intentionally cannot create databases or restore data.
+
+2026-10-08 regression correction: the interpolated archive script previously converted regex `{32}` to literal `32`, excluding valid private keys. The script now preserves the quantifier; an automatic test checks actual archive bytes and excludes invalid names. Old utility backups must not be assumed to contain documents: inspect and verify their storage archives. The corrected isolated-copy backup restored 3 documents/4 versions and verified all four blobs.
+
 Implemented operator utility: `ops/backup.py`. Requires Python 3.12+ and running Docker Compose DB/API. Backups contain sensitive documents and authentication data; keep the ignored `backups/` directory private and transfer/archive it encrypted using your organization's storage policy. No encryption key or production secret is committed.
 
 ```powershell

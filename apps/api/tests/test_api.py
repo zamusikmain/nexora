@@ -26,11 +26,20 @@ def database(tmp_path_factory):
     engine = create_engine(url)
     if engine.url.database != "nexora_test":
         pytest.fail("Integration tests only accept database named nexora_test")
+    admin_url = os.getenv("NEXORA_TEST_ADMIN_URL", url)
+    migration_url = os.getenv("NEXORA_TEST_MIGRATIONS_URL", url)
+    admin_engine = create_engine(admin_url)
+    migration_engine = create_engine(migration_url)
+    if any(e.url.database != "nexora_test" for e in (admin_engine, migration_engine)):
+        pytest.fail("All integration test connections must target nexora_test")
     previous = settings().database_url
-    settings().database_url = url
+    settings().database_url = migration_url
     config = Config("alembic.ini")
     command.upgrade(config, "head")
-    factory = sessionmaker(engine, expire_on_commit=False)
+    settings().database_url = url
+    # Fixture setup and deliberate direct-DB tampering are operator actions, not API privileges.
+    factory = sessionmaker(admin_engine, expire_on_commit=False)
+    runtime_factory = sessionmaker(engine, expire_on_commit=False)
     with factory.begin() as db:
         db.execute(
             text(
@@ -62,7 +71,7 @@ def database(tmp_path_factory):
     settings().storage_root = tmp_path_factory.mktemp("uploads")
 
     def override():
-        with factory() as db:
+        with runtime_factory() as db:
             yield db
 
     app.dependency_overrides[get_db] = override
@@ -70,6 +79,8 @@ def database(tmp_path_factory):
     app.dependency_overrides.clear()
     settings().database_url = previous
     engine.dispose()
+    admin_engine.dispose()
+    migration_engine.dispose()
 
 
 def client(name="owner"):
