@@ -17,3 +17,57 @@ coverage/
 .venv-win/
 
 backups/
+
+# Environment variants and local credentials (keep sanitized examples)
+.env.*
+*.env
+!.env.example
+!.env.*.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Local database files, dumps and backup artifacts
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+*.dump
+*.backup
+*.bak
+*.sql.gz
+/pgdata/
+/database-dumps/
+
+# Private runtime/user data; application source routes remain tracked
+/data/
+/storage/
+/documents/
+/user-documents/
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Logs, local temp artifacts and editor/OS caches
+logs/
+*.log
+*.log.*
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+.DS_Store
+Thumbs.db
