@@ -8,24 +8,29 @@ from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
 from pydantic import Field, model_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.access import receipt_data
 from app.audit import audit
 from app.auth import Actor, Db
-from app.documents import get_document, require_scan
+from app.documents import document_data, document_projection, get_document, require_scan, version_data
 from app.models import (
+    AccessGrant,
     Approval,
     Department,
     Document,
     DocumentVersion,
+    ReceiptRevocation,
+    ReviewReceipt,
     User,
     WorkflowEvent,
     WorkflowInstance,
     WorkflowTemplate,
 )
-from app.policy import require
+from app.policy import can_read, require
 from app.schemas import Input
 
 router = APIRouter(tags=["workflows"])
@@ -302,7 +307,9 @@ def commit_event(
 
 @router.get("/documents/{doc_id}/workflows")
 def document_workflows(doc_id: str, db: Db, user: Actor) -> list[dict]:
-    get_document(db, user, doc_id)
+    doc = get_document(db, user, doc_id)
+    if doc.owner_id != user.id:
+        raise HTTPException(404, "not_found")
     return [
         instance_data(i, db, user)
         for i in db.scalars(
@@ -317,7 +324,7 @@ def document_workflows(doc_id: str, db: Db, user: Actor) -> list[dict]:
 @router.post("/documents/{doc_id}/workflows", status_code=201)
 def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> dict:
     doc = get_document(db, user, doc_id, lock=True)
-    if doc.owner_id != user.id and user.role != "ADMIN":
+    if doc.owner_id != user.id:
         raise HTTPException(403, "forbidden")
     fingerprint = request_hash(doc_id, body)
     event = previous(db, user, body.idempotency_key, fingerprint)
@@ -338,6 +345,7 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
     if template is None:
         raise HTTPException(422, "invalid_workflow_template")
     snapshot = {
+        "card": jsonable_encoder(document_data(doc)),
         "metadata": doc.business_metadata,
         "confidentiality": doc.confidentiality,
         "title": doc.title,
@@ -397,13 +405,24 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
     row = db.get(WorkflowInstance, instance_id)
     if row is None:
         raise HTTPException(404, "not_found")
-    doc = get_document(db, user, row.document_id, lock=True)
-    instance = db.scalar(select(WorkflowInstance).where(WorkflowInstance.id == instance_id).with_for_update())
+    doc = db.scalar(select(Document).where(Document.id == row.document_id).with_for_update())
+    assert doc is not None
+    instance = db.scalar(select(WorkflowInstance).where(WorkflowInstance.id == instance_id).with_for_update().execution_options(populate_existing=True))
     assert instance is not None
     fingerprint = request_hash(instance_id, body)
     event = previous(db, user, body.idempotency_key, fingerprint)
     if event:
-        return instance_data(instance, db, user)
+        if doc.owner_id == user.id:
+            return instance_data(instance, db, user)
+        saved = db.scalar(select(ReviewReceipt).join(Approval, Approval.id == ReviewReceipt.approval_id).where(
+            ReviewReceipt.actor_id == user.id, Approval.instance_id == instance.id,
+            ReviewReceipt.idempotency_key == str(body.idempotency_key),
+        ))
+        if not saved:
+            raise HTTPException(404, "not_found")
+        approval = db.get(Approval, saved.approval_id)
+        assert approval is not None
+        return decision_receipt(db, user, approval, instance, doc, saved)
     if instance.status != "RUNNING":
         raise HTTPException(409, "workflow_not_running")
     approvals = list(
@@ -416,10 +435,16 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
     )
     mine = next((a for a in approvals if a.user_id == user.id and a.stage == instance.stage), None)
     if body.action == "cancel":
-        if doc.owner_id != user.id and user.role != "ADMIN":
-            raise HTTPException(403, "forbidden")
+        if doc.owner_id != user.id:
+            raise HTTPException(404, "not_found")
     elif mine is None or mine.status != "PENDING":
-        raise HTTPException(403, "not_assigned_approval")
+        # Owner gets a meaningful action error; hidden objects stay hidden.
+        raise HTTPException(403 if doc.owner_id == user.id else 404, "not_assigned_approval")
+    elif not can_read(db, user, doc, "card", instance.document_version_id) \
+            or not can_read(db, user, doc, "file", instance.document_version_id):
+        raise HTTPException(403, "access_required")
+    if doc.deleted_at:
+        raise HTTPException(409, "document_in_trash")
     template = db.get(WorkflowTemplate, instance.template_id)
     assert template is not None
     stage = Stage.model_validate(template.definition["stages"][instance.stage])
@@ -454,6 +479,22 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
     if instance.status != "RUNNING":
         instance.completed_at = datetime.now(UTC)
         doc.status = instance.status
+        for grant in db.scalars(select(AccessGrant).where(
+            AccessGrant.instance_id == instance.id, AccessGrant.purpose == "review",
+            AccessGrant.status.in_(["PENDING", "ACTIVE"]),
+        ).with_for_update()):
+            grant.status, grant.revoked_at = "REVOKED", datetime.now(UTC)
+            audit(db, request, user.id, "ACCESS_REVOKED", "access_grant", grant.id)
+    saved = None
+    if mine is not None and body.action != "cancel":
+        assert mine.acted_at is not None
+        saved = ReviewReceipt(approval_id=mine.id, actor_id=user.id,
+                              version_id=instance.document_version_id, outcome=mine.status,
+                              process_status=instance.status, acted_at=mine.acted_at,
+                              idempotency_key=str(body.idempotency_key),
+                              snapshot={"version_id": instance.document_version_id,
+                                        "title": instance.metadata_snapshot["title"], "own_comment": body.comment})
+        db.add(saved)
     doc.revision += 1
     commit_event(
         db,
@@ -468,21 +509,35 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
         fingerprint,
         old,
     )
+    if mine and saved:
+        return decision_receipt(db, user, mine, instance, doc, saved)
     return instance_data(instance, db, user)
+
+
+def decision_receipt(db: Db, user: Actor, approval: Approval, instance: WorkflowInstance,
+                     doc: Document, saved: ReviewReceipt) -> dict:
+    return {"kind": "receipt", "id": instance.id, "status": saved.process_status,
+            "stage": approval.stage, "receipt": receipt_data(db, user, approval, instance, doc)}
 
 
 @router.get("/approvals")
 def my_approvals(
     db: Db,
     user: Actor,
-    view: Literal["pending", "completed", "rejected", "overdue"] = "pending",
+    view: Literal["pending", "completed", "rejected", "overdue", "cancelled"] = "pending",
     page: int = Query(1, ge=1),
 ) -> dict:
-    conditions = [Approval.user_id == user.id, Document.deleted_at.is_(None)]
+    conditions = [Approval.user_id == user.id, ~select(ReceiptRevocation.approval_id).where(
+        ReceiptRevocation.approval_id == Approval.id, ReceiptRevocation.hide_receipt.is_(True)
+    ).exists()]
     if view in {"pending", "overdue"}:
         conditions.append(Approval.status == "PENDING")
+        conditions += [WorkflowInstance.status == "RUNNING", Approval.stage == WorkflowInstance.stage,
+                       Document.deleted_at.is_(None)]
     elif view == "completed":
         conditions.append(Approval.status == "APPROVED")
+    elif view == "cancelled":
+        conditions.append(Approval.status == "CANCELLED")
     else:
         conditions.append(Approval.status.in_(["REJECTED", "REVISION_REQUIRED"]))
     if view == "overdue":
@@ -500,17 +555,47 @@ def my_approvals(
     return {
         "total": total,
         "page": page,
-        "items": [
-            {
-                "id": a.id,
-                "instance_id": i.id,
-                "document_id": d.id,
-                "title": d.title,
-                "number": d.number,
-                "stage": a.stage,
-                "status": a.status,
-                "due_at": a.due_at,
-            }
-            for a, i, d in rows
-        ],
+        "items": [task_data(db, user, a, i, d) for a, i, d in rows],
     }
+
+
+def task_data(db: Db, user: Actor, approval: Approval, instance: WorkflowInstance, doc: Document) -> dict:
+    if approval.status != "PENDING":
+        result = receipt_data(db, user, approval, instance, doc)
+        # Task summaries never carry content-bearing snapshots.
+        result.pop("snapshot", None)
+        return {**result, "href": f"/approvals/{approval.id}/receipt"}
+    allowed = can_read(db, user, doc, "card", instance.document_version_id) \
+        and can_read(db, user, doc, "file", instance.document_version_id)
+    result = {"id": approval.id, "kind": "active_task" if allowed else "access_required",
+              "status": approval.status, "due_at": approval.due_at, "can_decide": allowed,
+              "href": f"/approvals/{approval.id}/{'review' if allowed else 'access'}"}
+    if allowed:
+        result.update({"title": instance.metadata_snapshot["title"],
+                       "number": instance.metadata_snapshot.get("card", {}).get("number", ""),
+                       "document_id": doc.id})
+    return result
+
+
+@router.get("/approvals/{approval_id}/review")
+def review_task(approval_id: str, db: Db, user: Actor) -> dict:
+    approval = db.get(Approval, approval_id)
+    if not approval or approval.user_id != user.id:
+        raise HTTPException(404, "not_found")
+    instance = db.get(WorkflowInstance, approval.instance_id)
+    assert instance is not None
+    doc = db.get(Document, instance.document_id)
+    assert doc is not None
+    if instance.status != "RUNNING" or approval.status != "PENDING" or approval.stage != instance.stage or doc.deleted_at:
+        raise HTTPException(404, "not_found")
+    task = task_data(db, user, approval, instance, doc)
+    if not task["can_decide"]:
+        return task
+    template = db.get(WorkflowTemplate, instance.template_id)
+    assert template is not None
+    stage = template.definition["stages"][approval.stage]
+    version = db.get(DocumentVersion, instance.document_version_id)
+    assert version is not None
+    return {**task, "instance_id": instance.id, "document": document_projection(db, user, doc),
+            "version": version_data(version), "stage": {key: stage.get(key) for key in
+                ("name_ru", "name_en", "require_comment")}}

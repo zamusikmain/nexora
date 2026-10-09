@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -167,6 +168,7 @@ class DocumentVersion(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
     change_note: Mapped[str | None] = mapped_column(String(1000))
+    metadata_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -176,6 +178,9 @@ class Comment(Base):
     document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"), index=True)
     author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     body: Mapped[str] = mapped_column(String(4000))
+    version_id: Mapped[str | None] = mapped_column(ForeignKey("document_versions.id"))
+    instance_id: Mapped[str | None] = mapped_column(ForeignKey("workflow_instances.id"))
+    stage: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -280,3 +285,104 @@ class FileScan(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     engine: Mapped[str] = mapped_column(String(40))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AclAuthority(Base):
+    """Operator-managed business authority. Runtime can SELECT, never assign it."""
+    __tablename__ = "acl_authorities"
+    __table_args__ = (
+        UniqueConstraint("user_id", "department_id", "office", name="uq_acl_authority"),
+        CheckConstraint("office IN ('CUSTODIAN','SECURITY')", name="acl_authority_office"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    department_id: Mapped[str] = mapped_column(ForeignKey("departments.id"))
+    office: Mapped[str] = mapped_column(String(20))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class DepartmentReviewPolicy(Base):
+    __tablename__ = "acl_department_policies"
+    department_id: Mapped[str] = mapped_column(ForeignKey("departments.id"), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class AccessGrant(Base):
+    __tablename__ = "access_grants"
+    __table_args__ = (
+        ForeignKeyConstraint(["document_id", "version_id"],
+                             ["document_versions.document_id", "document_versions.id"], name="fk_grant_version"),
+        CheckConstraint("status IN ('PENDING','ACTIVE','DENIED','REVOKED','EXPIRED')", name="grant_status"),
+        CheckConstraint("purpose IN ('personal','review','audit_snapshot','draft','incident')", name="grant_purpose"),
+        CheckConstraint("duration_hours > 0 AND duration_hours <= 168", name="grant_duration"),
+        Index("ix_grants_recipient_document", "recipient_id", "document_id", "status", "expires_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"))
+    version_id: Mapped[str] = mapped_column(String(36))
+    recipient_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    requested_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    recipient_role: Mapped[str] = mapped_column(String(20))
+    recipient_department_id: Mapped[str | None] = mapped_column(String(36))
+    department_id: Mapped[str | None] = mapped_column(String(36))
+    classification: Mapped[str] = mapped_column(String(20))
+    purpose: Mapped[str] = mapped_column(String(20))
+    instance_id: Mapped[str | None] = mapped_column(ForeignKey("workflow_instances.id"))
+    approval_id: Mapped[str | None] = mapped_column(ForeignKey("approvals.id"))
+    can_card: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_file: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_snapshot: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_comments: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_history: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_compare: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str] = mapped_column(String(1000))
+    duration_hours: Mapped[int] = mapped_column(Integer)
+    scope_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    review_deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
+class GrantEndorsement(Base):
+    __tablename__ = "grant_endorsements"
+    __table_args__ = (
+        UniqueConstraint("grant_id", "office", name="uq_grant_office"),
+        UniqueConstraint("grant_id", "actor_id", name="uq_grant_actor"),
+        CheckConstraint("office IN ('CUSTODIAN','SECURITY')", name="grant_office"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    grant_id: Mapped[str] = mapped_column(ForeignKey("access_grants.id"), index=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    authority_id: Mapped[str] = mapped_column(ForeignKey("acl_authorities.id"))
+    office: Mapped[str] = mapped_column(String(20))
+    scope_hash: Mapped[str] = mapped_column(String(64))
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ReviewReceipt(Base):
+    __tablename__ = "review_receipts"
+    __table_args__ = (UniqueConstraint("actor_id", "idempotency_key", name="uq_receipt_request"),)
+    approval_id: Mapped[str] = mapped_column(ForeignKey("approvals.id"), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    version_id: Mapped[str] = mapped_column(ForeignKey("document_versions.id"))
+    outcome: Mapped[str] = mapped_column(String(30))
+    process_status: Mapped[str] = mapped_column(String(30))
+    idempotency_key: Mapped[str] = mapped_column(String(36))
+    acted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+
+class ReceiptRevocation(Base):
+    __tablename__ = "receipt_revocations"
+    approval_id: Mapped[str] = mapped_column(ForeignKey("approvals.id"), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str] = mapped_column(String(1000))
+    hide_receipt: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

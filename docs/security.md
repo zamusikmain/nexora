@@ -1,5 +1,7 @@
 # Security: implemented controls and remaining gaps
 
+2026-10-08 update: ACL Revision 2 is implemented and verified in isolated tests in the working tree, **not deployed to the working database/containers**. See [ACL implementation](acl-implementation.md) and [safe cutover](acl-cutover.md). The older authorization description below records the 2026-10-07 deployed baseline; it does not describe the new candidate policy.
+
 Current enterprise increment, 2026-10-07. Commercial security readiness is not established.
 
 ## Authentication and authorization

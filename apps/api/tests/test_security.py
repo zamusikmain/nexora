@@ -8,7 +8,7 @@ from starlette.datastructures import Headers
 
 from app.auth import digest, password_hasher
 from app.models import Document, User
-from app.policy import can_read, require, require_write
+from app.policy import require, require_write
 from app.schemas import DocumentCreate, DocumentUpdate, Transition
 from app.storage import LocalStorage
 
@@ -21,16 +21,16 @@ def document(status="DRAFT"):
     return Document(id="document", owner_id="owner", department_id="it", status=status)
 
 
-@pytest.mark.parametrize("role", ["USER", "REVIEWER", "APPROVER", "LEGAL"])
+@pytest.mark.parametrize("role", ["USER", "REVIEWER", "APPROVER", "LEGAL", "MANAGER", "ADMIN"])
 def test_roles_do_not_read_other_documents(role):
-    assert not can_read(user(role, identity="outsider"), document())
-    assert can_read(user(role), document())
+    # Object/SQL decisions are covered by real PostgreSQL/HTTP matrix tests.
+    with pytest.raises(HTTPException):
+        require(user(role, identity="outsider"), "all_read")
 
 
 def test_manager_scope_and_admin():
-    assert can_read(user("MANAGER", identity="manager"), document())
-    assert not can_read(user("MANAGER", "legal", "manager"), document())
-    assert can_read(user("ADMIN", "legal", "admin"), document())
+    with pytest.raises(HTTPException):
+        require_write(user("ADMIN", "legal", "admin"), document())
     with pytest.raises(HTTPException):
         require(user(), "audit")
     with pytest.raises(HTTPException):

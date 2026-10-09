@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Document, WorkflowTemplate, WorkflowInstance } from "@/lib/types";
 import { useI18n } from "./provider";
-import { useUser } from "./shell";
 import { ErrorBox } from "./common";
 export function Workflow({
   doc,
@@ -15,7 +14,6 @@ export function Workflow({
   mutate: (path: string, options: RequestInit) => Promise<boolean>;
 }) {
   const { t, lang } = useI18n();
-  const user = useUser();
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [instances, setInstances] = useState<WorkflowInstance[]>([]);
   const [template, setTemplate] = useState("");
@@ -42,7 +40,7 @@ export function Workflow({
       active = false;
     };
   }, [doc.id, doc.revision]);
-  const owner = doc.owner_id === user?.id || user?.role === "ADMIN";
+  const owner = doc.capabilities.workflow;
   const current = instances.find((x) => x.status === "RUNNING");
   const mine = current?.approvals.find(
     (x) => x.mine && x.status === "PENDING" && x.stage === current.stage,

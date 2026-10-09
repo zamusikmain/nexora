@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Activity, Catalog, Comment, Document, Version } from "@/lib/types";
 import { useI18n } from "@/components/provider";
-import { useUser } from "@/components/shell";
 import { CustomFields, collectCustomFields } from "@/components/custom-fields";
 import { Workflow } from "@/components/workflow";
 import { DmsActions } from "@/components/dms-actions";
+import { AccessControls } from "@/components/access-controls";
 import {
   DocumentMetadata,
   collectMetadata,
@@ -17,7 +17,6 @@ import { Badge, ErrorBox } from "@/components/common";
 export default function Page() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
-  const user = useUser();
   const [scanner, setScanner] = useState("");
   useEffect(() => {
     api<{ malware_scanning: string }>("/capabilities")
@@ -32,42 +31,39 @@ export default function Page() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const generation = useRef({ value: 0 });
   const load = useCallback(async () => {
-    const [d, v, c, a, types] = await Promise.all([
-      api<Document>(`/documents/${id}`),
-      api<Version[]>(`/documents/${id}/versions`),
-      api<Comment[]>(`/documents/${id}/comments`),
-      api<Activity[]>(`/documents/${id}/activity`),
-      api<Catalog[]>("/document-types"),
-    ]);
-    setDoc(d);
-    setVersions(v);
-    setComments(c);
-    setActivity(a);
-    setTypes(types);
+    const current = ++generation.current.value;
+    try {
+      const d = await api<Document>(`/documents/${id}`);
+      const [v, c, a, types] = await Promise.all([
+        d.capabilities.versions ? api<Version[]>(`/documents/${id}/versions`) : Promise.resolve([]),
+        d.capabilities.comments ? api<Comment[]>(`/documents/${id}/comments`) : Promise.resolve([]),
+        d.capabilities.activity ? api<Activity[]>(`/documents/${id}/activity`) : Promise.resolve([]),
+        api<Catalog[]>("/document-types"),
+      ]);
+      if (current !== generation.current.value) return;
+      setDoc(d); setVersions(v); setComments(c); setActivity(a); setTypes(types); setError("");
+    } catch (e) {
+      if (current !== generation.current.value) return;
+      setDoc(null); setVersions([]); setComments([]); setActivity([]); setEditing(false);
+      throw e;
+    }
   }, [id]);
   useEffect(() => {
-    Promise.all([
-      api<Document>(`/documents/${id}`),
-      api<Version[]>(`/documents/${id}/versions`),
-      api<Comment[]>(`/documents/${id}/comments`),
-      api<Activity[]>(`/documents/${id}/activity`),
-      api<Catalog[]>("/document-types"),
-    ])
-      .then(([d, v, c, a, types]) => {
-        setDoc(d);
-        setVersions(v);
-        setComments(c);
-        setActivity(a);
-        setTypes(types);
-      })
-      .catch((e) => setError(e instanceof ApiError ? e.code : "error"));
-  }, [id]);
+    let active = true;
+    const counter = generation.current;
+    const refresh = () => load().catch((e) => { if (active) setError(e instanceof ApiError ? e.code : "error"); });
+    refresh();
+    const timer = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
+    return () => { active = false; counter.value++; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [load]);
   const fields =
     types.find((x) => x.id === doc?.type_id)?.metadata_schema?.fields || [];
-  const owner = doc && (doc.owner_id === user?.id || user?.role === "ADMIN");
+  const owner = doc?.capabilities.workflow;
   const editable =
-    owner &&
+    doc?.capabilities.write &&
     !doc?.deleted_at &&
     ["DRAFT", "REVISION_REQUIRED"].includes(doc?.status || "");
   async function mutate(path: string, options: RequestInit) {
@@ -202,7 +198,8 @@ export default function Page() {
                   )}
               </div>
             </div>
-            <Workflow doc={doc} busy={busy} mutate={mutate} />
+            {doc.capabilities.workflow && <Workflow doc={doc} busy={busy} mutate={mutate} />}
+            {doc.capabilities.share && <AccessControls doc={doc} />}
             <DmsActions
               doc={doc}
               versions={versions}
@@ -360,7 +357,7 @@ export default function Page() {
               )}
             </section>
             <div className="two-columns">
-              <section className="panel">
+              {doc.capabilities.comments && <section className="panel">
                 <h2>{t("comments")}</h2>
                 {comments.length ? (
                   comments.map((c) => (
@@ -389,8 +386,8 @@ export default function Page() {
                     <button disabled={busy}>{t("addComment")}</button>
                   </form>
                 )}
-              </section>
-              <section className="panel">
+              </section>}
+              {doc.capabilities.activity && <section className="panel">
                 <h2>{t("activity")}</h2>
                 {activity.map((a) => (
                   <div className="activity" key={a.id}>
@@ -404,7 +401,7 @@ export default function Page() {
                     </div>
                   </div>
                 ))}
-              </section>
+              </section>}
             </div>
           </>
         )

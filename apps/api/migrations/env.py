@@ -1,5 +1,6 @@
 from alembic import context
 from sqlalchemy import create_engine
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 from app.models import Base
@@ -17,7 +18,7 @@ if context.is_offline_mode():
     with context.begin_transaction():
         context.run_migrations()
 else:
-    engine = create_engine(settings().database_url)
+    engine = create_engine(settings().database_url, poolclass=NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
         with context.begin_transaction():

@@ -55,3 +55,19 @@ Lifecycle: DRAFT/REVISION_REQUIRED -> SUBMITTED (requires file); DRAFT/SUBMITTED
 - POST /auth/users/{id}/sessions/revoke — ADMIN revokes target's sessions.
 - GET /capabilities — authenticated actual scanner mode/development flag, no connection secrets.
 Production downloads/submissions/workflow starts reject missing clean scan evidence. Scanner failures are 503 scanner_unavailable; detected malware 422 malware_detected; missing legacy scan 503 file_scan_required; byte corruption 503 file_unavailable.
+# ACL Revision 2 candidate endpoints (not yet deployed)
+
+All routes below are under `/api/v1`; mutating requests keep session Origin/CSRF checks. Technical ADMIN does not imply document read or business authority.
+
+- `GET /access/people`: active organization directory (IDs/display names/departments, no credentials/document associations).
+- `GET /access/authority`: caller's unexpired operator-managed business offices.
+- `GET /access/grants?page=1`: only recipient/requester/owner/scoped office requests; frozen scope, status, endorsed offices, expiration. Expired grants deny reads immediately; this route also records expiration events.
+- `POST /documents/{id}/access-requests`: owner or scoped custodian requests a personal/version-bound grant. `recipient_id`, `version_id`, `reason`, `hours`, `actions`; purposes `personal`, `review`, `audit_snapshot`, `incident`, with assignment binding for review/audit_snapshot.
+- `POST /approvals/{id}/access-requests`: own current RESTRICTED task, or own stored snapshot; purpose `review` or `audit_snapshot`. Snapshot requests allow only the snapshot operation, no card/file.
+- `POST /access/grants/{id}/endorse`: current scoped business office and exact `scope_hash`; distinct actors, no self endorsement. `POST /access/grants/{id}/revoke`: reason required.
+- `PUT /departments/{id}/review-policy`: CUSTODIAN enables/disables ordinary draft handoff. `POST /documents/{id}/department-review`: owner hands a specific current version to the fixed current manager audience.
+- `GET /approvals`: pending/overdue only own current stage; completed/rejected/cancelled lists contain own minimal receipts. `GET /approvals/{id}/review`: own current task or neutral access-required state, frozen card and pinned file only.
+- `GET /approvals/{id}/receipt`: own minimal receipt plus permitted immutable own snapshot, never file permission. `POST /approvals/{id}/receipt/revoke`: scoped business authority; reason and optional complete hiding. Historical rows remain intact.
+- Workflow decision responses for a participant contain their own receipt, not the full route. Owners retain the full route. Replaying the same decision key returns the corresponding immutable receipt.
+
+See [policy matrix](acl-policy-revision-2.md), [implementation and limits](acl-implementation.md). Existing version/download/comment/activity/diff routes now authorize their individual resource; foreign/expired/revoked requests return 404.

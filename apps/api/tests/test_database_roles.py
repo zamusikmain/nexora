@@ -60,6 +60,13 @@ def test_role_attributes_and_ownership(role_connections):
     "SET session_replication_role='replica'",
     "UPDATE auth_sessions SET user_id='forged' WHERE false",
     "UPDATE auth_sessions SET csrf_token='forged' WHERE false",
+    "UPDATE acl_authorities SET active=true WHERE false",
+    "DELETE FROM acl_authorities WHERE false",
+    "INSERT INTO acl_authorities(id,user_id,department_id,office,active,expires_at) VALUES ('forged','owner','it','CUSTODIAN',true,now())",
+    "UPDATE grant_endorsements SET office='SECURITY' WHERE false",
+    "DELETE FROM access_grants WHERE false",
+    "UPDATE review_receipts SET outcome='APPROVED' WHERE false",
+    "DELETE FROM receipt_revocations WHERE false",
 ])
 def test_runtime_forbidden_statements(role_connections, statement):
     conn = role_connections[0]

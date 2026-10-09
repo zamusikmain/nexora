@@ -11,9 +11,9 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.audit import audit
 from app.auth import Actor, Db
-from app.documents import document_data, get_document, require_scan, version_data
-from app.models import DocumentVersion, Favorite, FileScan, Folder
-from app.policy import require_write
+from app.documents import document_data, get_document, require_scan, version_card_snapshot, version_data
+from app.models import DocumentVersion, Favorite, FileScan, Folder, uid
+from app.policy import assert_read, require_write
 from app.schemas import Input
 from app.storage import storage
 
@@ -40,7 +40,7 @@ def folder_data(folder: Folder) -> dict:
 
 def get_folder(db: Db, user: Actor, folder_id: str) -> Folder:
     folder = db.get(Folder, folder_id)
-    if folder is None or (folder.owner_id != user.id and user.role != "ADMIN"):
+    if folder is None or folder.owner_id != user.id:
         raise HTTPException(404, "not_found")
     return folder
 
@@ -51,7 +51,7 @@ def check_revision(doc, expected):
 
 
 def require_owner(user, doc):
-    if user.id != doc.owner_id and user.role != "ADMIN":
+    if user.id != doc.owner_id:
         raise HTTPException(403, "forbidden")
 
 
@@ -60,8 +60,7 @@ def folders(db: Db, user: Actor, parent_id: str | None = None) -> list[dict]:
     if parent_id:
         get_folder(db, user, parent_id)
     query = select(Folder).where(Folder.parent_id == parent_id).order_by(Folder.name, Folder.id).limit(200)
-    if user.role != "ADMIN":
-        query = query.where(Folder.owner_id == user.id)
+    query = query.where(Folder.owner_id == user.id)
     return [folder_data(f) for f in db.scalars(query)]
 
 
@@ -229,7 +228,9 @@ def restore_version(
         )
         or 0
     )
+    version_id, changed_at = uid(), datetime.now(UTC)
     version = DocumentVersion(
+        id=version_id,
         document_id=doc_id,
         version_number=last + 1,
         original_filename=saved.name,
@@ -239,6 +240,7 @@ def restore_version(
         sha256=saved.sha256,
         created_by=user.id,
         change_note=None,
+        metadata_snapshot=version_card_snapshot(doc, version_id, changed_at),
     )
     db.add(version)
     db.flush()
@@ -246,7 +248,7 @@ def restore_version(
         db.add(FileScan(version_id=version.id, sha256=version.sha256, engine=saved.scanned_by))
     doc.current_version_id = version.id
     doc.revision += 1
-    doc.updated_at = datetime.now(UTC)
+    doc.updated_at = changed_at
     audit(
         db,
         request,
@@ -262,9 +264,11 @@ def restore_version(
 
 @router.get("/documents/{doc_id}/versions/{version_id}/diff/{other_id}")
 def diff(doc_id: str, version_id: str, other_id: str, request: Request, db: Db, user: Actor) -> dict:
-    get_document(db, user, doc_id)
+    doc = get_document(db, user, doc_id)
     versions = []
     for key in (version_id, other_id):
+        assert_read(db, user, doc, "file", key)
+        assert_read(db, user, doc, "compare", key)
         version = db.scalar(
             select(DocumentVersion).where(DocumentVersion.id == key, DocumentVersion.document_id == doc_id)
         )

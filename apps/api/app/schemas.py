@@ -88,6 +88,7 @@ class SessionOut(BaseModel):
 
 
 class DocumentOut(DocumentMetadata):
+    capabilities: dict[str, bool] = Field(default_factory=dict)
     folder_id: str | None
     deleted_at: datetime | None
     revision: int

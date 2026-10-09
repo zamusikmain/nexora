@@ -24,6 +24,9 @@ def run():
 
     settings().database_url = os.environ["NEXORA_TEST_MIGRATIONS_URL"]
     config = Config("alembic.ini")
+    from verify_acl_compatibility import verify
+
+    verify(config, settings())
     # Prove complete fresh migrations AND full downgrade/reupgrade without SUPERUSER.
     command.upgrade(config, "head")
     command.downgrade(config, "base")
@@ -34,7 +37,7 @@ def run():
     subprocess.run(["python", "-m", "ruff", "check", "app", "tests"], check=True)
     subprocess.run(["python", "-m", "ruff", "check", "--no-cache", "/ops"], check=True)
     subprocess.run(["python", "-m", "mypy", "app"], check=True)
-    subprocess.run(["python", "-m", "pytest", "-q", "tests", "/ops/tests", "-o",
+    subprocess.run(["python", "-m", "pytest", "-q", "--maxfail=1", "tests", "/ops/tests", "-o",
                     "cache_dir=/tmp/roles-pytest"], check=True)
     print("ISOLATED_ROLE_SUITE_PASSED", flush=True)
 

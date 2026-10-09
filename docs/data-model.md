@@ -8,3 +8,6 @@ JSON business_metadata — расширяемые domain fields; document_types.
 
 
 Enterprise additions: folders/favorites, document folder/trash/revision and structured metadata (0002/0003); workflow_templates, workflow_instances, approvals, workflow_events (0004); immutable file_scans attestations (0005); public session UUID/user-agent (0006). Workflow templates/events are immutable, instance document/version/template/snapshot bindings are protected, one RUNNING instance per document is enforced by a partial unique index. Approval selectors and visibility indexes support assigned-user lookups. All migrations are additive and independent of runtime models. There is no tenant_id boundary yet.
+# ACL Revision 2 candidate schema
+
+Migration `0007_acl` adds six tables: `acl_authorities`, `acl_department_policies`, `access_grants`, `grant_endorsements`, `review_receipts`, `receipt_revocations`; nullable version metadata snapshots and comment version/process/stage provenance. It does not rewrite old documents, users, assignments, versions or events. Grant scope, endorsements and receipts are immutable. Downgrade blocks once new business records/snapshots/scoped comments exist. See [compatibility verification](acl-implementation.md) and [cutover/rollback](acl-cutover.md). This schema has only been applied in isolated environments.

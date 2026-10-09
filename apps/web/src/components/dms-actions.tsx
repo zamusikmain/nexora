@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { Document, Folder, Version } from "@/lib/types";
 import { useI18n } from "./provider";
-import { useUser } from "./shell";
 import { ErrorBox } from "./common";
 export function DmsActions({
   doc,
@@ -17,14 +16,13 @@ export function DmsActions({
   mutate: (path: string, options: RequestInit) => Promise<boolean>;
 }) {
   const { t } = useI18n();
-  const user = useUser();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [parent, setParent] = useState("");
   const [path, setPath] = useState<Folder[]>([]);
   const [diff, setDiff] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [comparing, setComparing] = useState(false);
-  const owner = doc.owner_id === user?.id || user?.role === "ADMIN";
+  const owner = doc.capabilities.workflow;
   const editable =
     owner &&
     !doc.deleted_at &&
@@ -163,7 +161,7 @@ export function DmsActions({
                 {t("restoreVersion")}
               </button>
             )}
-            {v.mime_type === "text/plain" &&
+            {doc.capabilities.compare && v.mime_type === "text/plain" &&
               versions.find((x) => x.id === doc.current_version_id)
                 ?.mime_type === "text/plain" && (
                 <button disabled={comparing} onClick={() => compare(v.id)}>

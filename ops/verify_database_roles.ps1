@@ -42,6 +42,8 @@ docker exec $taskDb psql -U postgres -d nexora_restore_test_roles -c 'ALTER SCHE
 docker exec $taskDb pg_restore -U postgres --role=nexora_migrations -d nexora_restore_test_roles --no-owner --no-acl --exit-on-error /tmp/roles.dump
 if ($LASTEXITCODE -ne 0) { throw 'Restore as migrations role failed' }
 docker exec $taskDb psql -U postgres -d nexora_restore_test_roles -At -c 'SELECT (SELECT count(*) FROM documents),(SELECT count(*) FROM document_versions),(SELECT count(*) FROM audit_events),(SELECT count(*) FROM workflow_instances);'
+docker run --rm --network $taskNetwork -v "${taskRoot}/ops:/ops:ro" -e NEXORA_ISOLATED_ROLE_TEST=isolated-docker-cluster -e NEXORA_ROLE_ADMIN_URL nexora-api python /ops/verify_acl_restore.py
+if ($LASTEXITCODE -ne 0) { throw 'Restored ACL/database fingerprints differ' }
 Write-Output "Backup and restore succeeded. Resources retained for inspection: $taskDb / $taskApi"
 # No container/volume removal is performed. Never use this script against a working DB.
 } finally {

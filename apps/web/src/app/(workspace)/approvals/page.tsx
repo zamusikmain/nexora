@@ -8,9 +8,11 @@ type Result = {
   total: number;
   items: {
     id: string;
-    document_id: string;
-    title: string;
-    number: string;
+    document_id?: string;
+    title?: string;
+    number?: string;
+    kind: string;
+    href: string;
     status: string;
     due_at: string | null;
   }[];
@@ -24,7 +26,7 @@ export default function Page() {
   const [busy, setBusy] = useState(true);
   useEffect(() => {
     let active = true;
-    api<Result>(`/approvals?view=${view}&page=${page}`)
+    const refresh = () => api<Result>(`/approvals?view=${view}&page=${page}`)
       .then((x) => {
         if (active) {
           setData(x);
@@ -32,13 +34,17 @@ export default function Page() {
         }
       })
       .catch((e) => {
-        if (active) setError(e instanceof ApiError ? e.code : "error");
+        if (active) { setData(null); setError(e instanceof ApiError ? e.code : "error"); }
       })
       .finally(() => {
         if (active) setBusy(false);
       });
+    refresh();
+    const timer = window.setInterval(refresh, 20000);
+    window.addEventListener("focus", refresh);
     return () => {
       active = false;
+      window.clearInterval(timer); window.removeEventListener("focus", refresh);
     };
   }, [view, page]);
   return (
@@ -55,7 +61,7 @@ export default function Page() {
               setBusy(true);
             }}
           >
-            {["pending", "completed", "rejected", "overdue"].map((v) => (
+            {["pending", "completed", "rejected", "overdue", "cancelled"].map((v) => (
               <option key={v} value={v}>
                 {t(v)}
               </option>
@@ -79,10 +85,10 @@ export default function Page() {
               <tbody>
                 {data.items.map((x) => (
                   <tr key={x.id}>
-                    <td>{x.number}</td>
+                    <td>{x.number || "—"}</td>
                     <td>
-                      <Link href={`/documents/${x.document_id}`}>
-                        {x.title}
+                      <Link href={x.href}>
+                        {x.title || t(x.kind === "access_required" ? "accessRequired" : x.kind === "cancelled" ? "cancelledTask" : "reviewReceipt")}
                       </Link>
                     </td>
                     <td>{t(x.status)}</td>

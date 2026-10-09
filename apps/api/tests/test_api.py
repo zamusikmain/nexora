@@ -151,8 +151,8 @@ def test_document_versions_lifecycle_audit_bola(database):
     assert stranger.get(base + "/comments").status_code == 404
     assert stranger.get(base + "/activity").status_code == 404
     assert doc["id"] not in [d["id"] for d in stranger.get("/api/v1/documents").json()["items"]]
-    assert manager.get(base).status_code == 200
-    assert manager.patch(base, json={"title": "forged", "business_metadata": {}}).status_code == 403
+    assert manager.get(base).status_code == 404
+    assert manager.patch(base, json={"title": "forged", "business_metadata": {}}).status_code == 404
     assert owner.patch(base, json={"title": "forged", "status": "APPROVED"}).status_code == 422
     assert owner.post(base + "/transitions", json={"action": "submit"}).status_code == 409
     v1 = owner.post(base + "/versions", files={"file": ("one.txt", b"first", "text/plain")}).json()
@@ -515,7 +515,7 @@ def test_workflow_parallel_snapshots_bola_and_idempotency(database):
         stranger.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 404
     )
     assert owner.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 403
-    assert admin.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 403
+    assert admin.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 404
     assert (
         manager.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())}).status_code == 422
     )
@@ -530,13 +530,14 @@ def test_workflow_parallel_snapshots_bola_and_idempotency(database):
     assert response.status_code == 200 and response.json()["stage"] == 0
     assert manager.post(wf, json=decision).status_code == 200
     assert manager.post(wf, json={**decision, "comment": "Different"}).status_code == 409
-    assert manager.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).status_code == 403
-    assert legal.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).json()["stage"] == 1
+    assert manager.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).status_code == 404
+    assert legal.post(wf, json={**decision, "idempotency_key": str(uuid.uuid4())}).json()["kind"] == "receipt"
+    assert owner.get(base + "/workflows").json()[0]["stage"] == 1
     assert admin.get("/api/v1/approvals").json()["total"] >= 1
     final = admin.post(wf, json={"action": "approve", "idempotency_key": str(uuid.uuid4())})
     assert final.status_code == 200 and final.json()["status"] == "APPROVED"
     assert owner.get(base).json()["status"] == "APPROVED"
-    assert len(final.json()["events"]) == 4
+    assert len(owner.get(base + "/workflows").json()[0]["events"]) == 4
     with database() as db:
         saved = db.get(WorkflowInstance, instance["id"])
         assert saved.metadata_snapshot["metadata"]["amount"] == 100

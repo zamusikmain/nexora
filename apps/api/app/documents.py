@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 
@@ -12,6 +13,8 @@ from app.auth import Actor, Db
 from app.config import settings
 from app.custom_fields import validate_metadata
 from app.models import (
+    AccessGrant,
+    Approval,
     AuditEvent,
     Comment,
     Document,
@@ -20,9 +23,19 @@ from app.models import (
     Favorite,
     FileScan,
     User,
+    WorkflowInstance,
     number_sequence,
+    uid,
 )
-from app.policy import can_read, require, require_write, visibility
+from app.policy import (
+    can_read,
+    grant_conditions,
+    require,
+    require_write,
+    resource_visibility,
+    visibility,
+    visible_field,
+)
 from app.schemas import (
     CommentCreate,
     CommentOut,
@@ -70,17 +83,61 @@ def document_data(doc: Document) -> dict[str, Any]:
     }
 
 
-def get_document(db: Db, user: Actor, doc_id: str, lock: bool = False) -> Document:
+def get_document(db: Db, user: Actor, doc_id: str, lock: bool = False,
+                 action: str = "card", version_id: str | None = None) -> Document:
     query = select(Document).where(Document.id == doc_id)
     if lock:
-        query = query.with_for_update()
+        query = query.with_for_update().execution_options(populate_existing=True)
     doc = db.scalar(query)
-    if not doc or (
-        not can_read(user, doc)
-        and not db.scalar(select(Document.id).where(Document.id == doc_id, visibility(user)))
-    ):
+    if not doc or not can_read(db, user, doc, action, version_id):
         raise HTTPException(404, "not_found")
     return doc
+
+
+def version_card_snapshot(doc: Document, version_id: str, changed_at: datetime) -> dict:
+    return jsonable_encoder({**document_data(doc), "current_version_id": version_id,
+                            "revision": doc.revision + 1, "updated_at": changed_at})
+
+
+def active_review(db: Db, user: Actor, doc: Document) -> tuple[Approval, WorkflowInstance] | None:
+    row = db.execute(select(Approval, WorkflowInstance).join(WorkflowInstance).where(
+        WorkflowInstance.document_id == doc.id, WorkflowInstance.status == "RUNNING",
+        Approval.user_id == user.id, Approval.status == "PENDING", Approval.stage == WorkflowInstance.stage,
+    )).first()
+    return (row[0], row[1]) if row and can_read(db, user, doc) else None
+
+
+def document_projection(db: Db, user: Actor, doc: Document) -> dict:
+    owner = doc.owner_id == user.id
+    result = document_data(doc)
+    if not owner:
+        review = active_review(db, user, doc)
+        if review:
+            snapshot = review[1].metadata_snapshot
+            # Legacy snapshots never borrow mutable present-day fields.
+            result = snapshot.get("card") or {
+                "id": doc.id, "number": "", "title": snapshot["title"], "type_id": "",
+                "owner_id": "", "department_id": None, "status": "IN_APPROVAL",
+                "business_metadata": snapshot["metadata"], "confidentiality": doc.confidentiality,
+                "revision": snapshot["revision"], "current_version_id": review[1].document_version_id,
+                "folder_id": None, "deleted_at": None, "created_at": review[1].created_at,
+                "updated_at": review[1].created_at,
+            }
+            result = {**result, "status": "IN_APPROVAL", "current_version_id": review[1].document_version_id}
+        else:
+            grant = db.scalar(select(AccessGrant).join(Document, Document.id == AccessGrant.document_id).where(
+                Document.id == doc.id, grant_conditions(user, doc.current_version_id, "card"),
+            ).order_by(AccessGrant.requested_at.desc(), AccessGrant.id).limit(1))
+            if grant and grant.snapshot:
+                result = dict(grant.snapshot)
+        result = {**result, "folder_id": None, "confidentiality": doc.confidentiality}
+    capabilities = {"write": owner and doc.deleted_at is None and doc.status in {"DRAFT", "REVISION_REQUIRED"},
+                    "workflow": owner, "share": owner and doc.deleted_at is None,
+                    "versions": True, "comments": owner or active_review(db, user, doc) is not None,
+                    "activity": can_read(db, user, doc, "history")}
+    capabilities["compare"] = can_read(db, user, doc, "compare")
+    capabilities["comments"] = capabilities["comments"] or can_read(db, user, doc, "comments")
+    return {**result, "capabilities": capabilities}
 
 
 @router.get("", response_model=DocumentListOut)
@@ -112,7 +169,7 @@ def list_documents(
         escaped = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         conditions.append(
             or_(
-                Document.title.ilike(f"%{escaped}%", escape="\\"),
+                visible_field(user, "title").ilike(f"%{escaped}%", escape="\\"),
                 Document.number.ilike(f"%{escaped}%", escape="\\"),
             )
         )
@@ -122,7 +179,7 @@ def list_documents(
         (Document.department_id, department_id),
     ]:
         if value:
-            conditions.append(column == value)
+            conditions.append((visible_field(user, "status") if column is Document.status else column) == value)
     total = db.scalar(select(func.count()).select_from(Document).where(*conditions))
     docs = db.scalars(
         select(Document)
@@ -131,7 +188,7 @@ def list_documents(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).all()
-    return {"items": [document_data(d) for d in docs], "total": total, "page": page}
+    return {"items": [document_projection(db, user, d) for d in docs], "total": total, "page": page}
 
 
 def metadata_values(body, db: Db) -> dict:
@@ -179,7 +236,7 @@ def create_document(body: DocumentCreate, request: Request, db: Db, user: Actor)
 
 @router.get("/{doc_id}", response_model=DocumentOut)
 def read_document(doc_id: str, db: Db, user: Actor) -> dict:
-    return document_data(get_document(db, user, doc_id))
+    return document_projection(db, user, get_document(db, user, doc_id))
 
 
 @router.patch("/{doc_id}", response_model=DocumentOut)
@@ -192,6 +249,9 @@ def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db,
     if doc_type is None:
         raise HTTPException(422, "invalid_document_type")
     supplied = metadata_values(body, db)
+    if doc.confidentiality == "RESTRICTED" and "confidentiality" in body.model_fields_set \
+            and body.confidentiality != "RESTRICTED":
+        raise HTTPException(403, "classification_change_forbidden")
     merged = {key: supplied[key] if key in body.model_fields_set else getattr(doc, key) for key in supplied}
     try:
         DocumentMetadata.model_validate(merged)
@@ -213,7 +273,7 @@ def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db,
 @router.post("/{doc_id}/transitions", response_model=DocumentOut)
 def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Actor) -> dict:
     doc = get_document(db, user, doc_id, lock=True)
-    if doc.owner_id != user.id and user.role != "ADMIN":
+    if doc.owner_id != user.id:
         raise HTTPException(403, "forbidden")
     if doc.deleted_at is not None:
         raise HTTPException(409, "document_in_trash")
@@ -253,7 +313,8 @@ def versions(doc_id: str, db: Db, user: Actor) -> list[dict]:
         version_data(v)
         for v in db.scalars(
             select(DocumentVersion)
-            .where(DocumentVersion.document_id == doc_id)
+            .join(Document, Document.id == DocumentVersion.document_id)
+            .where(DocumentVersion.document_id == doc_id, resource_visibility(user, "file", DocumentVersion.id))
             .order_by(DocumentVersion.version_number.desc())
         )
     ]
@@ -299,7 +360,9 @@ def upload_version(
             )
             or 0
         )
+        version_id, changed_at = uid(), datetime.now(UTC)
         version = DocumentVersion(
+            id=version_id,
             document_id=doc.id,
             version_number=last + 1,
             original_filename=saved.name,
@@ -309,6 +372,7 @@ def upload_version(
             sha256=saved.sha256,
             created_by=user.id,
             change_note=change_note or None,
+            metadata_snapshot=version_card_snapshot(doc, version_id, changed_at),
         )
         db.add(version)
         db.flush()
@@ -316,7 +380,7 @@ def upload_version(
             db.add(FileScan(version_id=version.id, sha256=version.sha256, engine=saved.scanned_by))
         doc.current_version_id = version.id
         doc.revision += 1
-        doc.updated_at = datetime.now(UTC)
+        doc.updated_at = changed_at
         audit(db, request, user.id, "FILE_UPLOADED", "document", doc.id, {"version": last + 1})
         audit(db, request, user.id, "VERSION_CREATED", "document", doc.id, {"version_id": version.id})
         db.commit()
@@ -330,7 +394,7 @@ def upload_version(
 
 @router.get("/{doc_id}/versions/{version_id}/download")
 def download(doc_id: str, version_id: str, request: Request, db: Db, user: Actor) -> StreamingResponse:
-    get_document(db, user, doc_id)
+    get_document(db, user, doc_id, action="file", version_id=version_id)
     version = db.scalar(
         select(DocumentVersion).where(DocumentVersion.id == version_id, DocumentVersion.document_id == doc_id)
     )
@@ -378,11 +442,21 @@ def download(doc_id: str, version_id: str, request: Request, db: Db, user: Actor
 
 @router.get("/{doc_id}/comments", response_model=list[CommentOut])
 def comments(doc_id: str, db: Db, user: Actor) -> list[dict]:
-    get_document(db, user, doc_id)
+    doc = get_document(db, user, doc_id)
+    conditions = [Comment.document_id == doc_id]
+    if doc.owner_id != user.id:
+        review = active_review(db, user, doc)
+        if review:
+            conditions += [Comment.instance_id == review[1].id, Comment.stage == review[0].stage,
+                           Comment.version_id == review[1].document_version_id]
+        else:
+            if not can_read(db, user, doc, "comments"):
+                raise HTTPException(404, "not_found")
+            conditions += [Comment.version_id == doc.current_version_id, Comment.instance_id.is_(None)]
     return [
         {"id": c.id, "author_id": c.author_id, "body": c.body, "created_at": c.created_at}
         for c in db.scalars(
-            select(Comment).where(Comment.document_id == doc_id).order_by(Comment.created_at).limit(500)
+            select(Comment).where(*conditions).order_by(Comment.created_at).limit(500)
         )
     ]
 
@@ -393,17 +467,31 @@ def comment(doc_id: str, body: CommentCreate, request: Request, db: Db, user: Ac
     require(user, "comment")
     if doc.status == "ARCHIVED" or doc.deleted_at is not None:
         raise HTTPException(409, "document_not_editable")
-    c = Comment(document_id=doc_id, author_id=user.id, body=body.body)
+    review = active_review(db, user, doc)
+    if doc.owner_id != user.id and not review and not can_read(db, user, doc, "comments"):
+        raise HTTPException(404, "not_found")
+    # An owner's new reply during a running review belongs to its current stage.
+    # Never relabel legacy comments or let a client choose a different stage.
+    process = review[1] if review else db.scalar(select(WorkflowInstance).where(
+        WorkflowInstance.document_id == doc.id, WorkflowInstance.status == "RUNNING",
+    )) if doc.owner_id == user.id and doc.status == "IN_APPROVAL" else None
+    c = Comment(document_id=doc_id, author_id=user.id, body=body.body,
+                version_id=process.document_version_id if process else doc.current_version_id,
+                instance_id=process.id if process else None, stage=process.stage if process else None)
     db.add(c)
     db.flush()
-    audit(db, request, user.id, "COMMENT_ADDED", "document", doc_id, {"comment_id": c.id})
+    audit(db, request, user.id, "COMMENT_ADDED", "document", doc_id,
+          {"comment_id": c.id, "version_id": c.version_id})
     db.commit()
     return {"id": c.id, "author_id": c.author_id, "body": c.body, "created_at": c.created_at}
 
 
 @router.get("/{doc_id}/activity")
 def activity(doc_id: str, db: Db, user: Actor) -> list[dict]:
-    get_document(db, user, doc_id)
+    doc = get_document(db, user, doc_id, action="history")
+    conditions = [AuditEvent.target_type == "document", AuditEvent.target_id == doc_id]
+    if doc.owner_id != user.id:
+        conditions.append(AuditEvent.safe_metadata["version_id"].as_string() == doc.current_version_id)
     return [
         {
             "id": a.id,
@@ -414,7 +502,7 @@ def activity(doc_id: str, db: Db, user: Actor) -> list[dict]:
         }
         for a in db.scalars(
             select(AuditEvent)
-            .where(AuditEvent.target_type == "document", AuditEvent.target_id == doc_id)
+            .where(*conditions)
             .order_by(AuditEvent.created_at.desc())
             .limit(200)
         )

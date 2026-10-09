@@ -10,6 +10,12 @@ from psycopg import sql
 
 ROLES = ("nexora_runtime", "nexora_migrations", "nexora_backup")
 GRANTS = {
+    "acl_authorities": "SELECT",
+    "acl_department_policies": "SELECT, INSERT, UPDATE",
+    "access_grants": "SELECT, INSERT, UPDATE",
+    "grant_endorsements": "SELECT, INSERT",
+    "review_receipts": "SELECT, INSERT",
+    "receipt_revocations": "SELECT, INSERT",
     "departments": "SELECT, INSERT",
     "users": "SELECT, INSERT, UPDATE",
     "document_types": "SELECT, INSERT, UPDATE",
@@ -89,7 +95,7 @@ def provision(conn, passwords):
         "SELECT p.oid::regprocedure::text,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
         "WHERE n.nspname='public'"
     ).fetchall()
-    if {row[1] for row in functions} - {"nexora_immutable_row", "nexora_workflow_snapshot"}:
+    if {row[1] for row in functions} - {"nexora_immutable_row", "nexora_workflow_snapshot", "nexora_acl_grant_snapshot"}:
         raise ValueError("Unexpected public-schema functions")
     # Function signatures come from the server catalog, never user input.
     for signature, _ in functions:

@@ -34,6 +34,7 @@ export type Folder = {
   owner_id: string;
 };
 export type Document = {
+  capabilities: Record<string, boolean>;
   description: string;
   category: string;
   tags: string[];

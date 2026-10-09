@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from app.audit import audit
 from app.auth import Actor, Db, public_user
 from app.custom_fields import TypeInput
-from app.documents import document_data
+from app.documents import document_projection
 from app.models import AuditEvent, Department, Document, DocumentType, User
-from app.policy import require, visibility
+from app.policy import require, visibility, visible_field
 from app.schemas import UserOut, UserUpdate
 
 router = APIRouter(tags=["catalog"])
@@ -67,7 +67,8 @@ def update_user(user_id: str, body: UserUpdate, request: Request, db: Db, user: 
 @router.get("/dashboard")
 def dashboard(db: Db, user: Actor) -> dict:
     visible = visibility(user) & Document.deleted_at.is_(None)
-    statuses = db.execute(select(Document.status, func.count()).where(visible).group_by(Document.status))
+    status_field = visible_field(user, "status")
+    statuses = db.execute(select(status_field, func.count()).where(visible).group_by(status_field))
     types = db.execute(select(Document.type_id, func.count()).where(visible).group_by(Document.type_id))
     recent = db.scalars(select(Document).where(visible).order_by(Document.updated_at.desc()).limit(5))
     return {
@@ -78,15 +79,19 @@ def dashboard(db: Db, user: Actor) -> dict:
             .select_from(Document)
             .where(Document.owner_id == user.id, Document.deleted_at.is_(None))
         ),
-        "recent": [document_data(d) for d in recent],
+        "recent": [document_projection(db, user, d) for d in recent],
     }
 
 
 @router.get("/audit")
 def audit_events(db: Db, user: Actor, page: int = Query(1, ge=1)) -> dict:
     require(user, "audit")
+    visible = or_(AuditEvent.target_type != "document", AuditEvent.target_id.in_(
+        select(Document.id).where(Document.owner_id == user.id),
+    ))
     events = db.scalars(
         select(AuditEvent)
+        .where(visible)
         .order_by(AuditEvent.created_at.desc(), AuditEvent.id)
         .offset((page - 1) * 50)
         .limit(50)
@@ -101,11 +106,11 @@ def audit_events(db: Db, user: Actor, page: int = Query(1, ge=1)) -> dict:
                 "target_id": a.target_id,
                 "created_at": a.created_at,
                 "request_id": a.request_id,
-                "safe_metadata": a.safe_metadata,
+                "safe_metadata": a.safe_metadata if a.target_type not in {"access_grant", "approval"} else {},
             }
             for a in events
         ],
-        "total": db.scalar(select(func.count()).select_from(AuditEvent)),
+        "total": db.scalar(select(func.count()).select_from(AuditEvent).where(visible)),
     }
 
 
