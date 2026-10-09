@@ -60,6 +60,7 @@ export default function Page() {
     const form = new FormData(e.currentTarget);
     try {
       const body = {
+        ...(selected ? { expected_updated_at: selected.updated_at } : {}),
         code: form.get("code"),
         name_ru: form.get("name_ru"),
         name_en: form.get("name_en"),

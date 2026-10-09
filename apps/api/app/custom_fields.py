@@ -73,6 +73,22 @@ class TypeInput(Input):
         return self
 
 
+class TypeUpdate(Input):
+    expected_updated_at: datetime
+    code: str | None = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]{0,39}$")
+    name_ru: str | None = Field(default=None, min_length=1, max_length=100)
+    name_en: str | None = Field(default=None, min_length=1, max_length=100)
+    fields: list[CustomField] | None = Field(default=None, max_length=50)
+
+    @model_validator(mode="after")
+    def valid_patch(self):
+        if any(getattr(self, key) is None for key in self.model_fields_set - {"expected_updated_at"}):
+            raise ValueError("null_field")
+        if self.fields is not None and len({f.key for f in self.fields}) != len(self.fields):
+            raise ValueError("duplicate_fields")
+        return self
+
+
 def validate_value(field: CustomField, value: Any, db: Session | None) -> None:
     kind = field.kind
     valid = True

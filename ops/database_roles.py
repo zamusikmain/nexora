@@ -10,6 +10,8 @@ from psycopg import sql
 
 ROLES = ("nexora_runtime", "nexora_migrations", "nexora_backup")
 GRANTS = {
+    "operation_keys": "SELECT, INSERT",
+    "workflow_requirements": "SELECT",
     "acl_authorities": "SELECT",
     "acl_department_policies": "SELECT, INSERT, UPDATE",
     "access_grants": "SELECT, INSERT, UPDATE",

@@ -53,10 +53,17 @@ class DocumentCreate(DocumentMetadata):
 
 
 class DocumentUpdate(DocumentMetadata):
-    expected_revision: int | None = Field(default=None, ge=1)
-    title: str = Field(min_length=1, max_length=240)
+    expected_revision: int = Field(ge=1)
+    title: str | None = Field(default=None, min_length=1, max_length=240)
     business_metadata: dict[str, Any] = Field(default_factory=dict)
     _bounded = field_validator("business_metadata")(bounded_metadata)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def nonnull_title(cls, value):
+        if value is None:
+            raise ValueError("null_title")
+        return value
 
 
 class Transition(Input):
@@ -68,12 +75,21 @@ class CommentCreate(Input):
 
 
 class UserUpdate(Input):
-    role: str = Field(pattern="^(USER|REVIEWER|APPROVER|LEGAL|MANAGER|ADMIN)$")
-    status: str = Field(pattern="^(ACTIVE|BLOCKED|DISABLED)$")
+    expected_updated_at: datetime
+    role: str | None = Field(default=None, pattern="^(USER|REVIEWER|APPROVER|LEGAL|MANAGER|ADMIN)$")
+    status: str | None = Field(default=None, pattern="^(ACTIVE|BLOCKED|DISABLED)$")
     department_id: str | None = Field(default=None, max_length=36)
+
+    @field_validator("role", "status", mode="before")
+    @classmethod
+    def nonnull(cls, value):
+        if value is None:
+            raise ValueError("null_field")
+        return value
 
 
 class UserOut(BaseModel):
+    updated_at: datetime
     id: str
     email: str
     display_name: str

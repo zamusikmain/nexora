@@ -12,6 +12,7 @@ from app.audit import audit
 from app.auth import Actor, Db
 from app.config import settings
 from app.custom_fields import validate_metadata
+from app.idempotency import begin, finish, upload_failed
 from app.models import (
     AccessGrant,
     Approval,
@@ -213,6 +214,10 @@ def metadata_values(body, db: Db) -> dict:
 @router.post("", status_code=201, response_model=DocumentOut)
 def create_document(body: DocumentCreate, request: Request, db: Db, user: Actor) -> dict:
     require(user, "create")
+    replay = begin(db, user, request, body.model_dump(mode="json"))
+    if replay is not None:
+        get_document(db, user, replay["id"])
+        return replay
     doc_type = db.get(DocumentType, body.type_id)
     if not doc_type:
         raise HTTPException(422, "invalid_document_type")
@@ -230,8 +235,7 @@ def create_document(body: DocumentCreate, request: Request, db: Db, user: Actor)
     db.add(doc)
     db.flush()
     audit(db, request, user.id, "DOCUMENT_CREATED", "document", doc.id)
-    db.commit()
-    return document_data(doc)
+    return finish(db, document_data(doc))
 
 
 @router.get("/{doc_id}", response_model=DocumentOut)
@@ -243,7 +247,7 @@ def read_document(doc_id: str, db: Db, user: Actor) -> dict:
 def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db, user: Actor) -> dict:
     doc = get_document(db, user, doc_id, lock=True)
     require_write(user, doc)
-    if body.expected_revision is not None and body.expected_revision != doc.revision:
+    if body.expected_revision != doc.revision:
         raise HTTPException(409, "stale_document")
     doc_type = db.get(DocumentType, doc.type_id)
     if doc_type is None:
@@ -261,10 +265,13 @@ def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db,
         if key in body.model_fields_set:
             setattr(doc, key, value)
     doc.revision += 1
-    doc.title, doc.business_metadata = (
-        body.title,
-        validate_metadata(doc_type.metadata_schema, body.business_metadata, db),
-    )
+    if "title" in body.model_fields_set:
+        assert body.title is not None
+        doc.title = body.title
+    if "business_metadata" in body.model_fields_set:
+        # PATCH merges keys; explicit null clears only a nullable custom field.
+        doc.business_metadata = validate_metadata(doc_type.metadata_schema,
+            {**doc.business_metadata, **body.business_metadata}, db)
     audit(db, request, user.id, "DOCUMENT_UPDATED", "document", doc.id)
     db.commit()
     return document_data(doc)
@@ -272,9 +279,12 @@ def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db,
 
 @router.post("/{doc_id}/transitions", response_model=DocumentOut)
 def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     if doc.owner_id != user.id:
         raise HTTPException(403, "forbidden")
+    if replay is not None:
+        return replay
     if doc.deleted_at is not None:
         raise HTTPException(409, "document_in_trash")
     targets = {
@@ -302,8 +312,7 @@ def transition(doc_id: str, body: Transition, request: Request, db: Db, user: Ac
         doc.id,
         {"from": previous, "to": target},
     )
-    db.commit()
-    return document_data(doc)
+    return finish(db, document_data(doc))
 
 
 @router.get("/{doc_id}/versions", response_model=list[VersionOut])
@@ -344,14 +353,26 @@ def upload_version(
     file: UploadFile = File(),
     change_note: str = Form("", max_length=1000),
 ) -> dict:
+    import hashlib
+    digest = hashlib.sha256()
+    while chunk := file.file.read(64 * 1024):
+        digest.update(chunk)
+        if file.file.tell() > settings().max_upload_bytes:
+            raise HTTPException(413, "file_too_large")
+    file.file.seek(0)
+    replay = begin(db, user, request, {"filename": file.filename, "mime": file.content_type,
+        "sha256": digest.hexdigest(), "change_note": change_note})
     doc = get_document(db, user, doc_id, lock=True)
+    if replay is not None:
+        if doc.owner_id != user.id:
+            raise HTTPException(404, "not_found")
+        return replay
     require_write(user, doc)
     store = storage()
     try:
         saved = store.save(file)
     except HTTPException as error:
-        audit(db, request, user.id, "FILE_UPLOAD_BLOCKED", "document", doc.id, {"reason": error.detail})
-        db.commit()
+        upload_failed(db, request, user, doc.id, error.detail)
         raise
     try:
         last = (
@@ -383,13 +404,13 @@ def upload_version(
         doc.updated_at = changed_at
         audit(db, request, user.id, "FILE_UPLOADED", "document", doc.id, {"version": last + 1})
         audit(db, request, user.id, "VERSION_CREATED", "document", doc.id, {"version_id": version.id})
-        db.commit()
+        result = finish(db, version_data(version))
     except Exception:
         db.rollback()
         # A lost commit acknowledgement can leave a committed version. Keep the blob
         # until a DB-confirmed orphan sweep; deleting here could destroy valid data.
         raise
-    return version_data(version)
+    return result
 
 
 @router.get("/{doc_id}/versions/{version_id}/download")
@@ -463,6 +484,7 @@ def comments(doc_id: str, db: Db, user: Actor) -> list[dict]:
 
 @router.post("/{doc_id}/comments", status_code=201, response_model=CommentOut)
 def comment(doc_id: str, body: CommentCreate, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     require(user, "comment")
     if doc.status == "ARCHIVED" or doc.deleted_at is not None:
@@ -470,6 +492,8 @@ def comment(doc_id: str, body: CommentCreate, request: Request, db: Db, user: Ac
     review = active_review(db, user, doc)
     if doc.owner_id != user.id and not review and not can_read(db, user, doc, "comments"):
         raise HTTPException(404, "not_found")
+    if replay is not None:
+        return replay
     # An owner's new reply during a running review belongs to its current stage.
     # Never relabel legacy comments or let a client choose a different stage.
     process = review[1] if review else db.scalar(select(WorkflowInstance).where(
@@ -482,8 +506,7 @@ def comment(doc_id: str, body: CommentCreate, request: Request, db: Db, user: Ac
     db.flush()
     audit(db, request, user.id, "COMMENT_ADDED", "document", doc_id,
           {"comment_id": c.id, "version_id": c.version_id})
-    db.commit()
-    return {"id": c.id, "author_id": c.author_id, "body": c.body, "created_at": c.created_at}
+    return finish(db, {"id": c.id, "author_id": c.author_id, "body": c.body, "created_at": c.created_at})
 
 
 @router.get("/{doc_id}/activity")

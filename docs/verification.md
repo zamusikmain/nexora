@@ -1,5 +1,7 @@
 # NEXORA enterprise increment — verification
 
+2026-10-09: [Security & Reliability Hardening](workflow-hardening.md) records the isolated candidate checks, new migration 0008_hardening, PATCH/idempotency contracts, restore comparison and rollout limits. It does not change the deployed 0006 environment.
+
 2026-10-08 candidate update: [ACL Revision 2 verification](acl-implementation.md) supersedes the ACL/read-policy and test-count statements below for the prepared working-tree code: 507 PASS, 0 XFAIL, isolated migration/copy/restore tests and RU/EN browser checks. Production remains on the previously deployed code/schema; the commercial readiness limitations remain.
 
 2026-10-07. This report supersedes the historical Iteration 1/increment notes in [verification-history.md](verification-history.md). The entire commercial request is **PARTIALLY VERIFIED and incomplete**. Unimplemented modules below are not external blockers and are not claimed ready. No failing check is suppressed; configured final suites have zero skips.

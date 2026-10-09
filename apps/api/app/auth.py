@@ -54,6 +54,7 @@ def public_user(user: User) -> dict[str, str | None]:
         "role": user.role,
         "status": user.status,
         "department_id": user.department_id,
+        "updated_at": user.updated_at.isoformat(),
     }
 
 

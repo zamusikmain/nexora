@@ -15,14 +15,14 @@ export default function Login() {
     setError("");
     const form = new FormData(e.currentTarget);
     try {
-      const data = await api<{ csrf_token: string }>("/auth/login", {
+      const data = await api<{ csrf_token: string; user: { id: string } }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({
           email: form.get("email"),
           password: form.get("password"),
         }),
       });
-      setCsrf(data.csrf_token);
+      setCsrf(data.csrf_token, data.user.id);
       router.replace("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.code : "error");

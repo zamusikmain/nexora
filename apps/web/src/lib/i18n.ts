@@ -639,3 +639,24 @@ Object.assign(en, {
   ACCESS_REVOKED: "Access revoked", ACCESS_EXPIRED: "Access expired", RECEIPT_REVOKED: "Receipt access revoked",
   DEPARTMENT_REVIEW_UPDATED: "Department draft policy updated",
 });
+
+Object.assign(ru, {
+  idempotency_key_required: "Для операции требуется ключ повторного запроса.",
+  invalid_idempotency_key: "Некорректный ключ операции.",
+  stale_record: "Запись изменена другим пользователем. Обновите страницу.",
+  required_workflow: "Для этого типа документа требуется обязательный маршрут.",
+  required_stage_condition: "Обязательный маршрут не может пропускать этапы по условиям.",
+  unauthorized_reviewer: "Согласующий больше не соответствует правилам маршрута.",
+  workflow_scope_changed: "Версия или состав маршрута изменились. Требуется проверка.",
+  WORKFLOW_REQUIREMENT_UPDATED: "Обязательный маршрут обновлён",
+});
+Object.assign(en, {
+  idempotency_key_required: "An operation retry key is required.",
+  invalid_idempotency_key: "Invalid operation key.",
+  stale_record: "Another user changed this record. Refresh the page.",
+  required_workflow: "This document type requires its configured workflow.",
+  required_stage_condition: "A required workflow cannot skip stages using conditions.",
+  unauthorized_reviewer: "The reviewer no longer satisfies the workflow rules.",
+  workflow_scope_changed: "The version or workflow assignments changed. Review is required.",
+  WORKFLOW_REQUIREMENT_UPDATED: "Required workflow updated",
+});

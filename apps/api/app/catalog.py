@@ -3,8 +3,9 @@ from sqlalchemy import func, or_, select
 
 from app.audit import audit
 from app.auth import Actor, Db, public_user
-from app.custom_fields import TypeInput
+from app.custom_fields import TypeInput, TypeUpdate
 from app.documents import document_projection
+from app.idempotency import begin, finish
 from app.models import AuditEvent, Department, Document, DocumentType, User
 from app.policy import require, visibility, visible_field
 from app.schemas import UserOut, UserUpdate
@@ -29,6 +30,7 @@ def types(db: Db, user: Actor) -> list[dict]:
             "name_ru": t.name_ru,
             "name_en": t.name_en,
             "metadata_schema": t.metadata_schema,
+            "updated_at": t.updated_at,
         }
         for t in db.scalars(select(DocumentType).order_by(DocumentType.code))
     ]
@@ -45,12 +47,17 @@ def update_user(user_id: str, body: UserUpdate, request: Request, db: Db, user: 
     require(user, "admin")
     if user_id == user.id:
         raise HTTPException(409, "self_admin_change")
-    target = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    target = db.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
     if not target:
         raise HTTPException(404, "not_found")
+    if body.expected_updated_at != target.updated_at:
+        raise HTTPException(409, "stale_record")
     if body.department_id and not db.get(Department, body.department_id):
         raise HTTPException(422, "invalid_department")
-    target.role, target.status, target.department_id = body.role, body.status, body.department_id
+    for key, value in body.model_dump(exclude_unset=True, exclude={"expected_updated_at"}).items():
+        setattr(target, key, value)
+    if not db.is_modified(target):
+        return public_user(target)
     audit(
         db,
         request,
@@ -117,6 +124,9 @@ def audit_events(db: Db, user: Actor, page: int = Query(1, ge=1)) -> dict:
 @router.post("/document-types", status_code=201)
 def create_type(body: TypeInput, request: Request, db: Db, user: Actor) -> dict:
     require(user, "admin")
+    replay = begin(db, user, request, body.model_dump(mode="json"))
+    if replay is not None:
+        return replay
     from sqlalchemy.exc import IntegrityError
 
     row = DocumentType(
@@ -129,33 +139,36 @@ def create_type(body: TypeInput, request: Request, db: Db, user: Actor) -> dict:
     try:
         db.flush()
         audit(db, request, user.id, "DOCUMENT_TYPE_CREATED", "document_type", row.id)
-        db.commit()
+        result = finish(db, {"id": row.id, "code": row.code, "name_ru": row.name_ru,
+            "name_en": row.name_en, "metadata_schema": row.metadata_schema, "updated_at": row.updated_at})
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "duplicate_code") from None
-    return {
-        "id": row.id,
-        "code": row.code,
-        "name_ru": row.name_ru,
-        "name_en": row.name_en,
-        "metadata_schema": row.metadata_schema,
-    }
+    return result
 
 
 @router.patch("/document-types/{type_id}")
-def update_type(type_id: str, body: TypeInput, request: Request, db: Db, user: Actor) -> dict:
+def update_type(type_id: str, body: TypeUpdate, request: Request, db: Db, user: Actor) -> dict:
     require(user, "admin")
     from sqlalchemy.exc import IntegrityError
 
-    row = db.scalar(select(DocumentType).where(DocumentType.id == type_id).with_for_update())
+    row = db.scalar(select(DocumentType).where(DocumentType.id == type_id).with_for_update().execution_options(populate_existing=True))
     if row is None:
         raise HTTPException(404, "not_found")
+    if body.expected_updated_at != row.updated_at:
+        raise HTTPException(409, "stale_record")
     old_keys = {f["key"] for f in row.metadata_schema.get("fields", [])}
-    new_keys = {f.key for f in body.fields}
+    new_keys = {f.key for f in body.fields} if body.fields is not None else old_keys
     if old_keys - new_keys and db.scalar(select(Document.id).where(Document.type_id == row.id).limit(1)):
         raise HTTPException(409, "field_in_use")
-    row.code, row.name_ru, row.name_en = body.code, body.name_ru, body.name_en
-    row.metadata_schema = {"fields": [f.model_dump() for f in body.fields]}
+    for key in ("code", "name_ru", "name_en"):
+        if key in body.model_fields_set:
+            setattr(row, key, getattr(body, key))
+    if body.fields is not None:
+        row.metadata_schema = {"fields": [f.model_dump() for f in body.fields]}
+    if not db.is_modified(row):
+        return {"id": row.id, "code": row.code, "name_ru": row.name_ru, "name_en": row.name_en,
+                "metadata_schema": row.metadata_schema, "updated_at": row.updated_at}
     try:
         audit(db, request, user.id, "DOCUMENT_TYPE_UPDATED", "document_type", row.id)
         db.commit()
@@ -168,4 +181,5 @@ def update_type(type_id: str, body: TypeInput, request: Request, db: Db, user: A
         "name_ru": row.name_ru,
         "name_en": row.name_en,
         "metadata_schema": row.metadata_schema,
+        "updated_at": row.updated_at,
     }

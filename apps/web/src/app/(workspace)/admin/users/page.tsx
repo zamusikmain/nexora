@@ -30,6 +30,7 @@ export default function Page() {
       const result = await api<User>(`/users/${user.id}`, {
         method: "PATCH",
         body: JSON.stringify({
+          expected_updated_at: user.updated_at,
           role: f.get("role"),
           status: f.get("status"),
           department_id: f.get("department_id") || null,

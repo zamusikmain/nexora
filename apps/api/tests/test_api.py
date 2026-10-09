@@ -89,6 +89,28 @@ def client(name="owner"):
     response = c.post("/api/v1/auth/login", json={"email": name + "@test.local", "password": TEST_PASSWORD})
     assert response.status_code == 200, response.text
     c.headers["x-csrf-token"] = response.json()["csrf_token"]
+    from uuid import uuid4
+    original_post, original_patch = c.post, c.patch
+
+    def keyed_post(url, **kwargs):
+        kwargs["headers"] = {"Idempotency-Key": str(uuid4()), **kwargs.get("headers", {})}
+        return original_post(url, **kwargs)
+
+    def revision_patch(url, **kwargs):
+        if str(url).startswith("/api/v1/documents/") and "json" in kwargs:
+            payload = dict(kwargs["json"])
+            if "expected_revision" not in payload:
+                payload["expected_revision"] = c.get(url).json().get("revision", 1)
+            kwargs["json"] = payload
+        elif "json" in kwargs:
+            collection, ident = str(url).rsplit("/", 1)
+            if collection in {"/api/v1/users", "/api/v1/document-types", "/api/v1/folders"}:
+                rows = c.get(collection + '/' + ident + '/breadcrumbs' if collection == '/api/v1/folders' else collection).json()
+                row = next((r for r in rows if r["id"] == ident), {}) if isinstance(rows, list) else {}
+                kwargs["json"] = {"expected_updated_at": row.get("updated_at", "2000-01-01T00:00:00Z"), **kwargs["json"]}
+        return original_patch(url, **kwargs)
+
+    c.post, c.patch = keyed_post, revision_patch
     return c
 
 
@@ -211,7 +233,9 @@ def test_concurrent_numbering_and_versions(database):
     def concurrent_client():
         new = TestClient(app)
         new.cookies.set("nexora_session", token)
-        new.headers.update({"origin": settings().web_origin, "x-csrf-token": csrf})
+        import uuid
+        new.headers.update({"origin": settings().web_origin, "x-csrf-token": csrf,
+                            "Idempotency-Key": str(uuid.uuid4())})
         return new
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -357,7 +381,8 @@ def test_concurrent_folder_moves_cannot_create_cycle(database):
         new.headers.update({"origin": settings().web_origin, "x-csrf-token": csrf})
         return new.patch(
             "/api/v1/folders/" + roots[i]["id"],
-            json={"name": roots[i]["name"], "parent_id": roots[1 - i]["id"]},
+            json={"name": roots[i]["name"], "parent_id": roots[1 - i]["id"],
+                  "expected_updated_at": roots[i]["updated_at"]},
         ).status_code
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -418,7 +443,9 @@ def test_admin_document_types_and_server_custom_field_validation(database):
     result = create_custom({"amount": 150, "date": "2026-10-07", "person": "owner"})
     assert result.status_code == 201 and result.json()["business_metadata"]["currency"] == "KZT"
     base = "/api/v1/documents/" + result.json()["id"]
-    assert c.patch(base, json={"title": "Contract", "business_metadata": {}}).status_code == 422
+    preserved = c.patch(base, json={"title": "Contract", "business_metadata": {}})
+    assert preserved.status_code == 200 and preserved.json()["business_metadata"]["amount"] == 150
+    assert c.patch(base, json={"business_metadata": {"amount": None}}).status_code == 422
     assert c.patch("/api/v1/document-types/" + type_id, json=payload).status_code == 403
     payload["fields"][0]["enabled"] = False
     assert admin.patch("/api/v1/document-types/" + type_id, json=payload).status_code == 200

@@ -19,7 +19,6 @@ export function Workflow({
   const [template, setTemplate] = useState("");
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
-  const [retry] = useState(() => new Map<string, string>());
   useEffect(() => {
     let active = true;
     Promise.all([
@@ -46,19 +45,12 @@ export function Workflow({
     (x) => x.mine && x.status === "PENDING" && x.stage === current.stage,
   );
   async function run(path: string, body: Record<string, unknown>) {
-    const fingerprint = JSON.stringify({ path, body });
-    let key = retry.get(fingerprint);
-    if (!key) {
-      key = crypto.randomUUID();
-      retry.set(fingerprint, key);
-    }
     if (
       await mutate(path, {
         method: "POST",
-        body: JSON.stringify({ ...body, idempotency_key: key }),
+        body: JSON.stringify(body),
       })
     ) {
-      retry.delete(fingerprint);
       setComment("");
     }
   }

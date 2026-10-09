@@ -17,6 +17,7 @@ from app.access import receipt_data
 from app.audit import audit
 from app.auth import Actor, Db
 from app.documents import document_data, document_projection, get_document, require_scan, version_data
+from app.idempotency import begin, finish, workflow_lock
 from app.models import (
     AccessGrant,
     Approval,
@@ -28,6 +29,7 @@ from app.models import (
     User,
     WorkflowEvent,
     WorkflowInstance,
+    WorkflowRequirement,
     WorkflowTemplate,
 )
 from app.policy import can_read, require
@@ -141,6 +143,9 @@ def templates(db: Db, user: Actor) -> list[dict]:
 @router.post("/workflow-templates", status_code=201)
 def create_template(body: TemplateInput, request: Request, db: Db, user: Actor) -> dict:
     require(user, "admin")
+    replay = begin(db, user, request, body.model_dump(mode="json"))
+    if replay is not None:
+        return replay
     db.execute(
         text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": "template:" + body.code}
     )
@@ -166,8 +171,7 @@ def create_template(body: TemplateInput, request: Request, db: Db, user: Actor) 
     audit(
         db, request, user.id, "WORKFLOW_TEMPLATE_CREATED", "workflow_template", row.id, {"version": version}
     )
-    db.commit()
-    return template_data(row)
+    return finish(db, template_data(row))
 
 
 def matches(condition: Condition, snapshot: dict) -> bool:
@@ -323,6 +327,7 @@ def document_workflows(doc_id: str, db: Db, user: Actor) -> list[dict]:
 
 @router.post("/documents/{doc_id}/workflows", status_code=201)
 def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> dict:
+    workflow_lock(db, user, body.idempotency_key)
     doc = get_document(db, user, doc_id, lock=True)
     if doc.owner_id != user.id:
         raise HTTPException(403, "forbidden")
@@ -344,6 +349,11 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
     template = db.get(WorkflowTemplate, body.template_id)
     if template is None:
         raise HTTPException(422, "invalid_workflow_template")
+    requirement = db.get(WorkflowRequirement, doc.type_id)
+    if requirement and template.id != requirement.template_id:
+        raise HTTPException(409, "required_workflow")
+    if requirement and any(s.get("conditions") for s in template.definition["stages"]):
+        raise HTTPException(409, "required_stage_condition")
     snapshot = {
         "card": jsonable_encoder(document_data(doc)),
         "metadata": doc.business_metadata,
@@ -364,6 +374,9 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
         else:
             query = query.where(User.department_id.in_(stage.targets))
         users = list(db.scalars(query.order_by(User.id).limit(101)))
+        if requirement and db.scalar(select(User.id).where(User.id.in_(users),
+                User.role.not_in(requirement.reviewer_roles)).limit(1)):
+            raise HTTPException(422, "unauthorized_reviewer")
         if not users or len(users) > 100:
             raise HTTPException(422, "invalid_workflow_target")
         plan.append((index, stage, users))
@@ -371,6 +384,8 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
         raise HTTPException(422, "invalid_workflow_target")
     if not plan:
         raise HTTPException(422, "empty_workflow")
+    snapshot["reviewer_roles"] = requirement.reviewer_roles if requirement else None
+    snapshot["plan"] = [{"stage": index, "users": users} for index, _, users in plan]
     instance = WorkflowInstance(
         document_id=doc.id,
         document_version_id=doc.current_version_id,
@@ -401,6 +416,7 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
 
 @router.post("/workflows/{instance_id}/decisions")
 def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Actor) -> dict:
+    workflow_lock(db, user, body.idempotency_key)
     # Same lock ordering for start, decisions, document edits and cancellation.
     row = db.get(WorkflowInstance, instance_id)
     if row is None:
@@ -445,9 +461,24 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
         raise HTTPException(403, "access_required")
     if doc.deleted_at:
         raise HTTPException(409, "document_in_trash")
+    if doc.status != "IN_APPROVAL" or doc.current_version_id != instance.document_version_id:
+        raise HTTPException(409, "workflow_scope_changed")
     template = db.get(WorkflowTemplate, instance.template_id)
     assert template is not None
     stage = Stage.model_validate(template.definition["stages"][instance.stage])
+    if body.action != "cancel":
+        if user.id == doc.owner_id or (
+            stage.selector == "role" and user.role not in stage.targets
+        ) or (stage.selector == "department" and user.department_id not in stage.targets) or (
+            stage.selector == "user" and user.id not in stage.targets
+        ) or (instance.metadata_snapshot.get("reviewer_roles") is not None and
+              user.role not in instance.metadata_snapshot["reviewer_roles"]):
+            raise HTTPException(403, "unauthorized_reviewer")
+        plan = instance.metadata_snapshot.get("plan")
+        if plan and {(a.stage, a.user_id) for a in approvals} != {
+            (p["stage"], actor) for p in plan for actor in p["users"]
+        }:
+            raise HTTPException(409, "workflow_scope_changed")
     if (body.action != "approve" or stage.require_comment) and not body.comment:
         raise HTTPException(422, "approval_comment_required")
     old = instance.status
