@@ -33,7 +33,9 @@ GRANTS = {
     "workflow_events": "SELECT, INSERT",
     "file_scans": "SELECT, INSERT",
     "auth_sessions": "SELECT, INSERT, DELETE",
-    "login_throttles": "SELECT, INSERT, UPDATE",
+    # DELETE adds nothing beyond UPDATE (which can already reset failures) and lets the
+    # runtime connection run `python -m app.auth_cleanup` for stale windows.
+    "login_throttles": "SELECT, INSERT, UPDATE, DELETE",
 }
 
 
