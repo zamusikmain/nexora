@@ -23,7 +23,6 @@ export default function Page() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const keys = useRef(new Map<string, string>());
   const generation = useRef({ value: 0 });
   const load = useCallback(async () => {
     const current = ++generation.current.value;
@@ -40,13 +39,10 @@ export default function Page() {
   }, [load]);
   async function decide(action: string) {
     if (!data?.instance_id) return;
-    const fingerprint = JSON.stringify({ action, comment });
-    let key = keys.current.get(fingerprint);
-    if (!key) { key = crypto.randomUUID(); keys.current.set(fingerprint, key); }
     setBusy(true); setError("");
     try {
       await api(`/workflows/${data.instance_id}/decisions`, { method: "POST",
-        body: JSON.stringify({ action, comment, idempotency_key: key }) });
+        body: JSON.stringify({ action, comment }) });
       generation.current.value++; setData(null); setComment(""); router.push(`/approvals/${id}/receipt`);
     } catch (e) {
       if (e instanceof ApiError && [403, 404].includes(e.status)) { setData(null); setComment(""); }

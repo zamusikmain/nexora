@@ -1,0 +1,25 @@
+sequenceDiagram
+ actor User
+ participant Frontend
+ participant API as Backend/API
+ participant Auth as Auth/ACL
+ participant DB as PostgreSQL
+ participant Files as Private local storage
+ User->>Frontend: Скачать конкретную версию
+ Frontend->>API: GET /api/v1/documents/{doc_id}/versions/{version_id}/download
+ API->>Auth: Current user ACTIVE, file action pinned version
+ Auth->>DB: Session, owner / manager / current assignment / scoped grant
+ Note over Auth,DB: RESTRICTED grants: expiry, scope, два текущих независимых offices
+ alt Нет основания доступа
+  API-->>Frontend: 401 либо 404 not_found
+ else Доступ разрешён
+  API->>DB: Version belongs to doc, production FileScan attestation
+  API->>Files: Open key, read size/SHA, rewind
+  alt Missing/corrupt file / no attestation
+   API-->>Frontend: 503 file_unavailable / file_scan_required
+  else Файл проверен
+   API->>DB: Audit FILE_DOWNLOADED, COMMIT
+   API-->>Frontend: 200 binary attachment stream
+  end
+ end
+ Note over API,Files: Нет static/public URL, ClamAV при download заново не вызывается

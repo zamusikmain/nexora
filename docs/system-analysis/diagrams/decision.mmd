@@ -1,0 +1,29 @@
+sequenceDiagram
+ actor User as Текущий согласующий
+ participant Frontend
+ participant API as Backend/API
+ participant Auth as Auth/ACL
+ participant DB as PostgreSQL
+ User->>Frontend: approve / reject / revision
+ Frontend->>API: POST /api/v1/workflows/{instance_id}/decisions
+ API->>Auth: Cookie ACTIVE CSRF Origin, pinned card/file scope
+ API->>DB: Advisory key, document и instance locks, replay
+ alt Повтор того же решения
+  API->>DB: Найти собственный receipt
+  API-->>Frontend: 200 decision_receipt
+ else Новое решение
+  API->>DB: PENDING current stage, selector/roles, current version, scope plan
+  alt Не назначен / нужен допуск / scope изменён
+   API-->>Frontend: 404 / 403 access_required / 409 workflow_scope_changed
+  else Разрешено
+   alt approve и есть другие PENDING
+    API->>DB: Личное APPROVED, процесс остаётся RUNNING
+   else Последний approve этапа
+    API->>DB: Следующий этап PENDING либо process/document APPROVED
+   else reject / revision
+    API->>DB: Terminal REJECTED / REVISION_REQUIRED, отменить pending tasks
+   end
+   API->>DB: Receipt + event + audit, terminal review grants revoke, COMMIT
+   API-->>Frontend: 200 own receipt, can_download=false
+  end
+ end

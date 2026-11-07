@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     storage_root: Path = Path("/data/uploads")
     max_upload_bytes: int = 20 * 1024 * 1024
     session_hours: int = 12
+    # Comma-separated CIDRs/addresses/hostnames whose X-Forwarded-For is honoured for throttling.
+    trusted_proxies: str = ""
     seed_demo: bool = False
     demo_password: str = ""
     malware_scanner: Literal["disabled-development", "clamav"] = "disabled-development"

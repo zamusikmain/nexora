@@ -28,7 +28,8 @@ def run():
                                 expires_at=datetime.now(UTC)+timedelta(days=2)))
 
     def login(name):
-        c = httpx.Client(base_url='http://api:8000/api/v1', headers={'origin': os.environ['WEB_ORIGIN']})
+        c = httpx.Client(base_url='http://api:8000/api/v1', headers={'origin': os.environ['WEB_ORIGIN']},
+                        event_hooks={'request': [lambda r: r.headers.__setitem__('Idempotency-Key', str(uuid4()))]})
         r = c.post('/auth/login', json={'email': name+'@test.local', 'password': PASSWORD})
         assert r.status_code == 200, r.text
         c.headers['x-csrf-token'] = r.json()['csrf_token']

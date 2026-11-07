@@ -7,3 +7,6 @@ __pycache__
 
 .venv-win
 *.egg-info
+
+DEV_CREDENTIALS.local.md
+**/DEV_CREDENTIALS.local.md

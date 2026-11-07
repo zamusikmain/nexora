@@ -1,4 +1,6 @@
 # Implemented API
+2026-10-09 hardening candidate: mutations that can duplicate side effects require Idempotency-Key UUID; workflows use body idempotency_key. PATCH requires expected_revision (documents) or expected_updated_at (users, folders, document types); omitted fields are preserved and stale edits return 409. See [hardening contract and deployment](workflow-hardening.md). Working services have not been updated.
+
 Base /api/v1. Mutations require exact WEB_ORIGIN; authenticated mutations also require X-CSRF-Token. No password hashes, cookie token hashes or storage keys in public responses. Session management uses independent public UUIDs.
 
 | Methods | Path | Behavior |

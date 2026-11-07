@@ -1,0 +1,26 @@
+sequenceDiagram
+ actor User as Владелец
+ participant Frontend
+ participant API as Backend/API
+ participant Auth as Auth/ACL
+ participant DB as PostgreSQL
+ User->>Frontend: Запустить выбранный маршрут
+ Frontend->>API: POST /api/v1/documents/{doc_id}/workflows
+ Note over Frontend,API: JSON template_id, expected_revision, idempotency_key
+ API->>Auth: Cookie ACTIVE CSRF Origin, owner
+ Auth->>DB: Session/user, card visibility
+ API->>DB: Advisory key lock и document FOR UPDATE
+ alt Replay
+  API->>DB: WorkflowEvent и прежний instance
+  API-->>Frontend: 201 прежний instance representation
+ else Новая операция
+  API->>DB: revision, current version, FileScan, template, type requirement
+  alt Wrong revision / route / file
+   API-->>Frontend: 409 stale_document / required_workflow / file_required либо 503 file_scan_required
+  else Проверки выполнены
+   API->>DB: Resolve ACTIVE targets, исключить owner, сохранить snapshot и plan
+   API->>DB: INSERT instance и approvals, UPDATE IN_APPROVAL, audit/event, COMMIT
+   API-->>Frontend: 201 instance_data
+  end
+ end
+ Note over API,DB: Start проверяет attestation, не вызывает ClamAV заново

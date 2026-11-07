@@ -1,0 +1,20 @@
+{
+  "scope": "isolated local demonstration only; never working data",
+  "database": "nexora_test",
+  "environment_marker": "isolated-docker-cluster",
+  "authorities": [
+    {"user_id": "lab-custodian", "email": "lab-custodian@test.local", "application_role": "USER", "department_id": "it", "office": "CUSTODIAN", "lifetime_hours": 48},
+    {"user_id": "lab-security", "email": "lab-security@test.local", "application_role": "USER", "department_id": "it", "office": "SECURITY", "lifetime_hours": 48}
+  ],
+  "seed_script": "ops/seed_acl_lab.py",
+  "department_draft_review_enabled": false,
+  "route_proposals_applied": false,
+  "routes": [
+    {"classification": "PUBLIC", "stages": [{"selector": "user", "targets": ["manager"], "conditions": [], "require_comment": true}]},
+    {"classification": "INTERNAL", "stages": [{"selector": "user", "targets": ["legal"], "conditions": [], "require_comment": true}, {"selector": "user", "targets": ["manager"], "conditions": [], "require_comment": true}]},
+    {"classification": "CONFIDENTIAL", "stages": [{"selector": "user", "targets": ["legal"], "conditions": [], "require_comment": true}, {"selector": "user", "targets": ["manager"], "conditions": [], "require_comment": true}], "content_access": "current assigned stage and pinned version only"},
+    {"classification": "RESTRICTED", "stages": [{"selector": "user", "targets": ["legal"], "conditions": [], "require_comment": true}, {"selector": "user", "targets": ["manager"], "conditions": [], "require_comment": true}], "content_access": "current stage, pinned version and separate temporary permit endorsed by lab-custodian AND lab-security; each new recipient/stage requires its own permit"}
+  ],
+  "implementation_limit": "workflow_requirements is keyed by type_id only. These classification-dependent proposals cannot be directly enforced for mixed-classification document types. Choose one approved strict route per type or implement server-side type/classification rules first.",
+  "production_assignments": "Real independent people, scope and expiry must be approved separately. Synthetic identities must never be imported into the working database."
+}

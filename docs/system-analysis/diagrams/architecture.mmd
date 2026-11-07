@@ -1,0 +1,8 @@
+flowchart LR
+  U[Пользователь] --> W[Next.js RU EN]
+  W -->|Same origin REST cookie CSRF| A[FastAPI modular monolith]
+  A --> P[PostgreSQL]
+  A --> F[Private local storage]
+  A -->|TCP INSTREAM| C[ClamAV production]
+  O[Оператор ops] -->|Backup roles offices routes| P
+  O -->|Verified archive| F

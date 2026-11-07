@@ -67,6 +67,11 @@ def test_role_attributes_and_ownership(role_connections):
     "DELETE FROM access_grants WHERE false",
     "UPDATE review_receipts SET outcome='APPROVED' WHERE false",
     "DELETE FROM receipt_revocations WHERE false",
+    "UPDATE operation_keys SET fingerprint='forged' WHERE false",
+    "DELETE FROM operation_keys WHERE false",
+    "UPDATE workflow_requirements SET reviewer_roles='[]' WHERE false",
+    "DELETE FROM workflow_requirements WHERE false",
+    "INSERT INTO workflow_requirements(type_id,template_id,reviewer_roles) VALUES ('forged','forged','[]')",
 ])
 def test_runtime_forbidden_statements(role_connections, statement):
     conn = role_connections[0]

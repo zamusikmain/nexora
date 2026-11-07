@@ -1,0 +1,28 @@
+sequenceDiagram
+ actor User
+ participant Frontend
+ participant API as Backend/API
+ participant Auth as Auth/ACL
+ participant DB as PostgreSQL
+ User->>Frontend: Поля карточки
+ Frontend->>API: POST /api/v1/documents + UUID header
+ API->>Auth: Cookie ACTIVE CSRF Origin create permission
+ Auth->>DB: session hash и user
+ alt Нет сессии / CSRF
+  API-->>Frontend: 401 / 403 safe error
+ else Авторизован
+  API->>DB: actor UUID advisory lock, replay lookup
+  alt Повтор одинакового payload
+   API->>Auth: Текущий card access к replay document
+   API-->>Frontend: 201 тот же DocumentOut
+  else Новая операция
+   API->>DB: Проверить type, metadata references, sequence
+   alt Некорректные поля
+    API-->>Frontend: 422 validation / invalid_document_type
+   else Валидно
+    API->>DB: INSERT DRAFT, audit, operation result, COMMIT
+    API-->>Frontend: 201 DocumentOut
+   end
+  end
+ end
+ Note over API,DB: Файл загружается отдельным POST versions, не при регистрации карточки

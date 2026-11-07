@@ -73,6 +73,8 @@ def verify(config, settings):
     assert fingerprint() == before, 'Historical rows changed during rollback'
     command.upgrade(config, 'head')
     with psycopg.connect(copy_admin) as conn:
+        conn.execute("INSERT INTO operation_keys(actor_id,key,fingerprint,response) "
+                     "VALUES ('copy-user','00000000-0000-0000-0000-000000000001',repeat('d',64),'{}')")
         conn.execute("INSERT INTO acl_authorities(id,user_id,department_id,office,active,expires_at) "
                      "VALUES ('copy-authority','copy-user','copy-dept','CUSTODIAN',true,now()+interval '1 day')")
     try:
@@ -84,7 +86,8 @@ def verify(config, settings):
     assert fingerprint() == before
     with psycopg.connect(copy_admin) as conn:
         assert conn.execute("SELECT count(*) FROM acl_authorities").fetchone()[0] == 1
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == '0007_acl'
+        assert conn.execute("SELECT count(*) FROM operation_keys").fetchone()[0] == 1
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == '0008_hardening'
     settings.database_url = migration_url
     command.downgrade(config, 'base')
     print('ACL_COPY_UPGRADE_ROLLBACK_AND_HISTORY_PASSED', flush=True)
