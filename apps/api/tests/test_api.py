@@ -738,3 +738,39 @@ def test_session_inventory_scoping_revocation_and_admin(database):
     current = next(x for x in a.get("/api/v1/auth/sessions").json() if x["current"])
     assert a.delete("/api/v1/auth/sessions/" + current["id"]).status_code == 204
     assert a.get("/api/v1/auth/me").status_code == 401
+
+
+def test_document_list_query_count_does_not_grow_with_owned_rows(database):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+
+    c = client()
+    statements: list[str] = []
+
+    def count(conn, cursor, statement, *args):
+        statements.append(statement)
+
+    def queries_for_my_list() -> tuple[int, list[dict]]:
+        statements.clear()
+        event.listen(Engine, "before_cursor_execute", count)
+        try:
+            response = c.get("/api/v1/documents", params={"view": "my", "page_size": 100})
+        finally:
+            event.remove(Engine, "before_cursor_execute", count)
+        assert response.status_code == 200
+        return len(statements), response.json()["items"]
+
+    for _ in range(2):
+        create(c)
+    small, _ = queries_for_my_list()
+    for _ in range(6):
+        create(c)
+    large, items = queries_for_my_list()
+    assert len(items) >= 8
+    # Owner capability checks are answered by policy without per-row queries.
+    assert large == small, (small, large)
+    assert all(
+        {k: i["capabilities"][k] for k in ("activity", "compare", "comments", "workflow")}
+        == dict.fromkeys(("activity", "compare", "comments", "workflow"), True)
+        for i in items
+    )
