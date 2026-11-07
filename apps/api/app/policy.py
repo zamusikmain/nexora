@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import and_, case, false, func, literal, or_, select
+from sqlalchemy import and_, case, false, func, literal, or_, select, union_all
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -147,8 +147,32 @@ def resource_visibility(user: User, action: str = "card", version=None) -> Colum
     return or_(owner, grant_read(user, version, action))
 
 
-def visibility(user: User) -> ColumnElement[bool]:
-    return resource_visibility(user)
+def candidate_documents(user: User):
+    """Indexed superset of document ids resource_visibility(user) can admit for the card action.
+
+    Every branch of resource_visibility requires one of these: ownership, the manager's own
+    department (APPROVED), a pending approval of this user, or a grant to this user. Lists
+    use it to drive the scan from indexes; the full policy is still evaluated on each row.
+    """
+    parts = [
+        select(Document.id).where(Document.owner_id == user.id),
+        select(WorkflowInstance.document_id).join(Approval, Approval.instance_id == WorkflowInstance.id).where(
+            Approval.user_id == user.id, Approval.status == "PENDING"),
+        select(AccessGrant.document_id).where(AccessGrant.recipient_id == user.id),
+    ]
+    if user.role == "MANAGER" and user.department_id is not None:
+        parts.append(select(Document.id).where(
+            Document.department_id == user.department_id, Document.status == "APPROVED"))
+    return union_all(*parts)
+
+
+def visibility(user: User, prefilter: bool = True) -> ColumnElement[bool]:
+    """List/count filter. Pass prefilter=False when the query is already owner-selective."""
+    if user.status != "ACTIVE":
+        return false()
+    if not prefilter:
+        return resource_visibility(user)
+    return and_(Document.id.in_(candidate_documents(user)), resource_visibility(user))
 
 
 def visible_field(user: User, field: str):
