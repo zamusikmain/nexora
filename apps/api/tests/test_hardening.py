@@ -83,6 +83,33 @@ def test_required_route_rejects_unauthorized_roles_and_conditional_stages(databa
             db.query(WorkflowRequirement).filter_by(type_id="type").delete()
 
 
+def test_classification_can_only_rise_once_a_file_exists(database):
+    owner = client()
+    base = "/api/v1/documents/" + create(owner)["id"]
+
+    def classify(value):
+        return owner.patch(base, json={"confidentiality": value})
+
+    # Without a file the owner may still correct the classification either way.
+    assert classify("CONFIDENTIAL").status_code == 200
+    assert classify("INTERNAL").status_code == 200
+    assert classify("CONFIDENTIAL").status_code == 200
+    uploaded(owner, base)
+    lowered = classify("INTERNAL")
+    assert lowered.status_code == 403 and lowered.json()["error"] == "classification_change_forbidden"
+    assert classify("PUBLIC").status_code == 403
+    assert owner.get(base).json()["confidentiality"] == "CONFIDENTIAL"
+    assert classify("CONFIDENTIAL").status_code == 200  # unchanged value is not a downgrade
+    assert owner.patch(base, json={"title": "Other fields stay editable"}).status_code == 200
+    assert classify("RESTRICTED").status_code == 200
+    assert classify("CONFIDENTIAL").status_code == 403
+
+    # RESTRICTED is never lowered, even before any file.
+    empty = "/api/v1/documents/" + create(owner)["id"]
+    assert owner.patch(empty, json={"confidentiality": "RESTRICTED"}).status_code == 200
+    assert owner.patch(empty, json={"confidentiality": "PUBLIC"}).status_code == 403
+
+
 def test_required_route_is_selected_by_type_and_classification(database):
     from app.models import WorkflowInstance
 
