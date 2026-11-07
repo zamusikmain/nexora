@@ -156,7 +156,8 @@ def list_documents(
     page_size: int = Query(25, ge=1, le=100),
 ) -> dict:
     conditions = [
-        visibility(user),
+        # "my" is already owner-selective via its index; the candidate pre-filter would only add work.
+        visibility(user, prefilter=view != "my"),
         Document.deleted_at.is_not(None) if view == "trash" else Document.deleted_at.is_(None),
     ]
     if view == "my":

@@ -187,3 +187,21 @@ def test_confidential_content_requires_specific_authority(database, role, classi
     base = "/api/v1/documents/" + response.json()["id"]
     version = uploaded(owner, base)
     assert client(role).get(base + "/versions/" + version + "/download").status_code == 404
+
+
+def test_list_prefilter_admits_exactly_the_full_policy(database):
+    """The indexed candidate pre-filter must never hide or reveal a document versus the policy."""
+    from sqlalchemy import select
+
+    from app.models import Document
+    from app.policy import visibility
+
+    owner, _, _, _, decisions = setup_flow(parallel=True)
+    assert client("legal").post(decisions, json={"action": "approve", "idempotency_key": str(uuid4())}).status_code == 200
+    with database() as db:
+        users = list(db.scalars(select(User)))
+        assert len(users) >= 5
+        for user in users:
+            fast = set(db.scalars(select(Document.id).where(visibility(user))))
+            full = set(db.scalars(select(Document.id).where(visibility(user, prefilter=False))))
+            assert fast == full, user.id
