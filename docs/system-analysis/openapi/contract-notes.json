@@ -1,0 +1,474 @@
+{
+  "kind": "AS-IS code-derived supplement; not generated OpenAPI",
+  "error_envelope": {
+    "error": "string",
+    "request_id": "uuid"
+  },
+  "cookie": "nexora_session",
+  "operations": [
+    {
+      "id": "API-001",
+      "method": "GET",
+      "path": "/api/v1/health",
+      "authorization": "Публично, без проверки зависимостей.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/main.py:78"
+    },
+    {
+      "id": "API-002",
+      "method": "GET",
+      "path": "/api/v1/ready",
+      "authorization": "Публично; SELECT 1, 503 при ошибке БД.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/main.py:83"
+    },
+    {
+      "id": "API-003",
+      "method": "GET",
+      "path": "/api/v1/capabilities",
+      "authorization": "любая ACTIVE сессия.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/main.py:102"
+    },
+    {
+      "id": "API-004",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "authorization": "Без сессии; точный Origin на POST; ACTIVE credentials и throttle.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:61"
+    },
+    {
+      "id": "API-005",
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "authorization": "собственная сессия; csrf token отдаётся для subsequent requests.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:136"
+    },
+    {
+      "id": "API-006",
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "authorization": "собственная сессия; удаление cookie и аудит.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:141"
+    },
+    {
+      "id": "API-007",
+      "method": "GET",
+      "path": "/api/v1/auth/sessions",
+      "authorization": "только свои ACTIVE sessions, максимум 20; public_id.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:149"
+    },
+    {
+      "id": "API-008",
+      "method": "POST",
+      "path": "/api/v1/auth/sessions/revoke-others",
+      "authorization": "собственные остальные sessions.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:169"
+    },
+    {
+      "id": "API-009",
+      "method": "DELETE",
+      "path": "/api/v1/auth/sessions/{session_id}",
+      "authorization": "только собственная session по public_id; чужая 404.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:180"
+    },
+    {
+      "id": "API-010",
+      "method": "POST",
+      "path": "/api/v1/auth/users/{user_id}/sessions/revoke",
+      "authorization": "ADMIN; target существует.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/auth.py:197"
+    },
+    {
+      "id": "API-011",
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "authorization": "SQL visibility; нет blanket ADMIN; фильтры не обходят ACL.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:144"
+    },
+    {
+      "id": "API-012",
+      "method": "POST",
+      "path": "/api/v1/documents",
+      "authorization": "Любая ACTIVE роль с create; owner/dept берутся из user.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/documents.py:214"
+    },
+    {
+      "id": "API-013",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}",
+      "authorization": "card visibility; frozen projection для участника/grant.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:241"
+    },
+    {
+      "id": "API-014",
+      "method": "PATCH",
+      "path": "/api/v1/documents/{doc_id}",
+      "authorization": "owner, editable, не trash; expected_revision; RESTRICTED downgrade запрещён.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:246"
+    },
+    {
+      "id": "API-015",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/transitions",
+      "authorization": "owner, не trash; submit/cancel/archive по допустимым source states; submit требует файл/scan.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/documents.py:280"
+    },
+    {
+      "id": "API-016",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/versions",
+      "authorization": "card доступ плюс file action отдельно для каждой версии.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:318"
+    },
+    {
+      "id": "API-017",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/versions",
+      "authorization": "owner, editable, не trash; file validation и scanner.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/documents.py:347"
+    },
+    {
+      "id": "API-018",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/versions/{version_id}/download",
+      "authorization": "file action конкретной версии, принадлежащей doc; scan/checksum; audit.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:416"
+    },
+    {
+      "id": "API-019",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/comments",
+      "authorization": "owner или текущий review: только его stage/version; иначе comments grant текущей версии.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:464"
+    },
+    {
+      "id": "API-020",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/comments",
+      "authorization": "card + comment permission; owner/active review/explicit comments grant; не archive/trash.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/documents.py:485"
+    },
+    {
+      "id": "API-021",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/activity",
+      "authorization": "history action; foreign events дополнительно по version_id текущей версии.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/documents.py:512"
+    },
+    {
+      "id": "API-022",
+      "method": "GET",
+      "path": "/api/v1/departments",
+      "authorization": "любая ACTIVE сессия; общий справочник.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:16"
+    },
+    {
+      "id": "API-023",
+      "method": "GET",
+      "path": "/api/v1/document-types",
+      "authorization": "любая ACTIVE сессия; общий справочник типов.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:24"
+    },
+    {
+      "id": "API-024",
+      "method": "GET",
+      "path": "/api/v1/users",
+      "authorization": "ADMIN; до 500 записей, без password_hash.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:39"
+    },
+    {
+      "id": "API-025",
+      "method": "PATCH",
+      "path": "/api/v1/users/{user_id}",
+      "authorization": "ADMIN; нельзя менять себя; CAS expected_updated_at.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:45"
+    },
+    {
+      "id": "API-026",
+      "method": "GET",
+      "path": "/api/v1/dashboard",
+      "authorization": "SQL visibility и frozen title/status; только доступные карточки.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:74"
+    },
+    {
+      "id": "API-027",
+      "method": "GET",
+      "path": "/api/v1/audit",
+      "authorization": "ADMIN audit; document events только owner, остальные target types доступны.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:93"
+    },
+    {
+      "id": "API-028",
+      "method": "POST",
+      "path": "/api/v1/document-types",
+      "authorization": "ADMIN; валидная metadata schema и уникальный code.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/catalog.py:124"
+    },
+    {
+      "id": "API-029",
+      "method": "PATCH",
+      "path": "/api/v1/document-types/{type_id}",
+      "authorization": "ADMIN; CAS expected_updated_at, проверка влияния schema.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/catalog.py:150"
+    },
+    {
+      "id": "API-030",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/access-requests",
+      "authorization": "owner либо действующий CUSTODIAN отдела; scope фиксируется.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/access.py:187"
+    },
+    {
+      "id": "API-031",
+      "method": "POST",
+      "path": "/api/v1/approvals/{approval_id}/access-requests",
+      "authorization": "только собственное назначение RESTRICTED; review/audit_snapshot и ограниченные actions.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/access.py:202"
+    },
+    {
+      "id": "API-032",
+      "method": "GET",
+      "path": "/api/v1/access/grants",
+      "authorization": "получатель/requester/owner/действующий office; GET материализует до 100 истёкших grants с аудитом.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:229"
+    },
+    {
+      "id": "API-033",
+      "method": "POST",
+      "path": "/api/v1/access/grants/{grant_id}/endorse",
+      "authorization": "действующий указанный office; actor != requester/recipient/предыдущий voter; scope_hash.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/access.py:254"
+    },
+    {
+      "id": "API-034",
+      "method": "POST",
+      "path": "/api/v1/access/grants/{grant_id}/revoke",
+      "authorization": "visible_grant: requester/recipient/owner либо действующее office.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:308"
+    },
+    {
+      "id": "API-035",
+      "method": "PUT",
+      "path": "/api/v1/departments/{department_id}/review-policy",
+      "authorization": "только действующий CUSTODIAN отдела.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:326"
+    },
+    {
+      "id": "API-036",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/department-review",
+      "authorization": "owner, policy enabled, same dept MANAGER, PUBLIC/INTERNAL, editable current version.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/access.py:340"
+    },
+    {
+      "id": "API-037",
+      "method": "POST",
+      "path": "/api/v1/approvals/{approval_id}/receipt/revoke",
+      "authorization": "действующий CUSTODIAN или SECURITY отдела; hide_receipt опционален.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:367"
+    },
+    {
+      "id": "API-038",
+      "method": "GET",
+      "path": "/api/v1/approvals/{approval_id}/receipt",
+      "authorization": "только своё решение; revocation/snapshot условия; никогда file.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:421"
+    },
+    {
+      "id": "API-039",
+      "method": "GET",
+      "path": "/api/v1/access/people",
+      "authorization": "любая ACTIVE сессия, организационный каталог до 500 ACTIVE лиц, без паролей.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:433"
+    },
+    {
+      "id": "API-040",
+      "method": "GET",
+      "path": "/api/v1/access/authority",
+      "authorization": "только собственные действующие offices.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/access.py:440"
+    },
+    {
+      "id": "API-041",
+      "method": "GET",
+      "path": "/api/v1/folders",
+      "authorization": "только owner дерева; parent_id проверяется.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:71"
+    },
+    {
+      "id": "API-042",
+      "method": "GET",
+      "path": "/api/v1/folders/{folder_id}/breadcrumbs",
+      "authorization": "только owner всех ancestors; максимум depth 32.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:80"
+    },
+    {
+      "id": "API-043",
+      "method": "POST",
+      "path": "/api/v1/folders",
+      "authorization": "личное дерево; owner lock, depth <=32.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/dms.py:93"
+    },
+    {
+      "id": "API-044",
+      "method": "PATCH",
+      "path": "/api/v1/folders/{folder_id}",
+      "authorization": "owner, expected_updated_at; owner lock, no cycle/depth overflow.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:114"
+    },
+    {
+      "id": "API-045",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/move",
+      "authorization": "owner editable; expected_revision; только собственная папка.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/dms.py:148"
+    },
+    {
+      "id": "API-046",
+      "method": "PUT",
+      "path": "/api/v1/documents/{doc_id}/favorite",
+      "authorization": "card доступ; только собственная favorite relation.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:166"
+    },
+    {
+      "id": "API-047",
+      "method": "DELETE",
+      "path": "/api/v1/documents/{doc_id}/favorite",
+      "authorization": "card доступ; только собственная favorite relation.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:173"
+    },
+    {
+      "id": "API-048",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/trash",
+      "authorization": "owner; CAS, правила состояния в handler, soft delete.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/dms.py:182"
+    },
+    {
+      "id": "API-049",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/restore",
+      "authorization": "owner; CAS; только trash.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/dms.py:204"
+    },
+    {
+      "id": "API-050",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/versions/{version_id}/restore",
+      "authorization": "owner editable; CAS; исходная версия в doc; новый blob и scan.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/dms.py:220"
+    },
+    {
+      "id": "API-051",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/versions/{version_id}/diff/{other_id}",
+      "authorization": "card + file и compare для обеих версий; TXT <=256KiB и <=2000 lines.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/dms.py:295"
+    },
+    {
+      "id": "API-052",
+      "method": "GET",
+      "path": "/api/v1/workflow-templates",
+      "authorization": "любая ACTIVE сессия; последние версии по code (до 100).",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/workflows.py:121"
+    },
+    {
+      "id": "API-053",
+      "method": "POST",
+      "path": "/api/v1/workflow-templates",
+      "authorization": "ADMIN; selectors/targets валидны; новая immutable версия.",
+      "idempotency": "UUID header Idempotency-Key обязателен; durable operation_keys.",
+      "code_reference": "apps/api/app/workflows.py:143"
+    },
+    {
+      "id": "API-054",
+      "method": "GET",
+      "path": "/api/v1/documents/{doc_id}/workflows",
+      "authorization": "только owner; не все участники прежнего процесса.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/workflows.py:312"
+    },
+    {
+      "id": "API-055",
+      "method": "POST",
+      "path": "/api/v1/documents/{doc_id}/workflows",
+      "authorization": "owner; CAS; file/scan; required template/reviewer roles; owner исключён из plan.",
+      "idempotency": "UUID body idempotency_key обязателен; durable workflow_events.",
+      "code_reference": "apps/api/app/workflows.py:328"
+    },
+    {
+      "id": "API-056",
+      "method": "POST",
+      "path": "/api/v1/workflows/{instance_id}/decisions",
+      "authorization": "текущий PENDING actor, selector и reviewer roles, card/file pinned version; cancel только owner.",
+      "idempotency": "UUID body idempotency_key обязателен; durable workflow_events.",
+      "code_reference": "apps/api/app/workflows.py:417"
+    },
+    {
+      "id": "API-057",
+      "method": "GET",
+      "path": "/api/v1/approvals",
+      "authorization": "только свои задания; pending текущий этап; no title без допуска.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/workflows.py:554"
+    },
+    {
+      "id": "API-058",
+      "method": "GET",
+      "path": "/api/v1/approvals/{approval_id}/review",
+      "authorization": "только своё текущее задание; без card/file возвращает access_required.",
+      "idempotency": "begin/replay отсутствует; CAS/естественная повторяемость согласно handler.",
+      "code_reference": "apps/api/app/workflows.py:611"
+    }
+  ]
+}
