@@ -31,6 +31,7 @@ from app.models import (
 from app.policy import (
     can_read,
     grant_conditions,
+    read_actions,
     require,
     require_write,
     resource_visibility,
@@ -111,8 +112,8 @@ def active_review(db: Db, user: Actor, doc: Document) -> tuple[Approval, Workflo
 def document_projection(db: Db, user: Actor, doc: Document) -> dict:
     owner = doc.owner_id == user.id
     result = document_data(doc)
+    review = None if owner else active_review(db, user, doc)
     if not owner:
-        review = active_review(db, user, doc)
         if review:
             snapshot = review[1].metadata_snapshot
             # Legacy snapshots never borrow mutable present-day fields.
@@ -132,12 +133,12 @@ def document_projection(db: Db, user: Actor, doc: Document) -> dict:
             if grant and grant.snapshot:
                 result = dict(grant.snapshot)
         result = {**result, "folder_id": None, "confidentiality": doc.confidentiality}
+    # One statement for all read checks (none for owners) instead of one query per capability.
+    readable = read_actions(db, user, doc, ("history", "compare", "comments"))
     capabilities = {"write": owner and doc.deleted_at is None and doc.status in {"DRAFT", "REVISION_REQUIRED"},
-                    "workflow": owner, "share": owner and doc.deleted_at is None,
-                    "versions": True, "comments": owner or active_review(db, user, doc) is not None,
-                    "activity": can_read(db, user, doc, "history")}
-    capabilities["compare"] = can_read(db, user, doc, "compare")
-    capabilities["comments"] = capabilities["comments"] or can_read(db, user, doc, "comments")
+                    "workflow": owner, "share": owner and doc.deleted_at is None, "versions": True,
+                    "comments": owner or review is not None or readable["comments"],
+                    "activity": readable["history"], "compare": readable["compare"]}
     return {**result, "capabilities": capabilities}
 
 

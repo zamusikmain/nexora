@@ -172,6 +172,16 @@ def can_read(db: Session, user: User, doc: Document, action: str = "card", versi
     )))
 
 
+def read_actions(db: Session, user: User, doc: Document, actions: tuple[str, ...]) -> dict[str, bool]:
+    """can_read for several actions in one statement; owners skip the query (policy grants them)."""
+    if user.status == "ACTIVE" and doc.owner_id == user.id and not {"card", "file"} & set(actions):
+        return dict.fromkeys(actions, True)
+    row = db.execute(select(*(
+        case((resource_visibility(user, action), True), else_=False).label(action) for action in actions
+    )).where(Document.id == doc.id)).one_or_none()
+    return {action: bool(row and row._mapping[action]) for action in actions}
+
+
 def assert_read(db: Session, user: User, doc: Document, action: str = "card", version=None) -> None:
     if not can_read(db, user, doc, action, version):
         raise HTTPException(404, "not_found")
