@@ -71,3 +71,6 @@ temp/
 .cache/
 .DS_Store
 Thumbs.db
+
+# Local-only development login reference; never commit credentials
+DEV_CREDENTIALS.local.md
