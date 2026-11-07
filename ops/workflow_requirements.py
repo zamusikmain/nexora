@@ -12,6 +12,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--type-id", required=True)
     parser.add_argument("--template-id", required=True)
+    parser.add_argument(
+        "--classification",
+        default="*",
+        choices=["*", "PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"],
+        help="Exact document classification; '*' (default) covers classifications without their own route",
+    )
     parser.add_argument("--reviewer-roles", nargs="+", required=True)
     parser.add_argument("--reason", required=True)
     parser.add_argument("--apply", action="store_true")
@@ -38,9 +44,10 @@ def main():
             conn.rollback()
             return
         conn.execute(
-            "INSERT INTO workflow_requirements(type_id,template_id,reviewer_roles) VALUES (%s,%s,%s) "
-            "ON CONFLICT(type_id) DO UPDATE SET template_id=EXCLUDED.template_id,reviewer_roles=EXCLUDED.reviewer_roles",
-            (args.type_id, args.template_id, Jsonb(roles)),
+            "INSERT INTO workflow_requirements(type_id,classification,template_id,reviewer_roles) "
+            "VALUES (%s,%s,%s,%s) ON CONFLICT(type_id,classification) "
+            "DO UPDATE SET template_id=EXCLUDED.template_id,reviewer_roles=EXCLUDED.reviewer_roles",
+            (args.type_id, args.classification, args.template_id, Jsonb(roles)),
         )
         conn.execute(
             "INSERT INTO audit_events(id,actor_id,action,target_type,target_id,safe_metadata,request_id) "
@@ -50,7 +57,8 @@ def main():
                 "WORKFLOW_REQUIREMENT_UPDATED",
                 "document_type",
                 args.type_id,
-                Jsonb({"template_id": args.template_id, "reviewer_roles": roles, "reason": args.reason}),
+                Jsonb({"template_id": args.template_id, "classification": args.classification,
+                       "reviewer_roles": roles, "reason": args.reason}),
                 str(uuid4()),
             ),
         )

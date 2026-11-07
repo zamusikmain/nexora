@@ -349,7 +349,10 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
     template = db.get(WorkflowTemplate, body.template_id)
     if template is None:
         raise HTTPException(422, "invalid_workflow_template")
-    requirement = db.get(WorkflowRequirement, doc.type_id)
+    # An exact (type, classification) route wins over the type-wide '*' route.
+    requirement = db.get(WorkflowRequirement, (doc.type_id, doc.confidentiality)) or db.get(
+        WorkflowRequirement, (doc.type_id, "*")
+    )
     if requirement and template.id != requirement.template_id:
         raise HTTPException(409, "required_workflow")
     if requirement and any(s.get("conditions") for s in template.definition["stages"]):
@@ -385,6 +388,10 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
     if not plan:
         raise HTTPException(422, "empty_workflow")
     snapshot["reviewer_roles"] = requirement.reviewer_roles if requirement else None
+    snapshot["required_route"] = (
+        {"template_id": requirement.template_id, "classification": requirement.classification}
+        if requirement else None
+    )
     snapshot["plan"] = [{"stage": index, "users": users} for index, _, users in plan]
     instance = WorkflowInstance(
         document_id=doc.id,

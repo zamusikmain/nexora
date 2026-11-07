@@ -87,7 +87,10 @@ def verify(config, settings):
     with psycopg.connect(copy_admin) as conn:
         assert conn.execute("SELECT count(*) FROM acl_authorities").fetchone()[0] == 1
         assert conn.execute("SELECT count(*) FROM operation_keys").fetchone()[0] == 1
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == '0008_hardening'
+        # The blocked rollback is transactional: the database stays at the current head.
+        from alembic.script import ScriptDirectory
+        head = ScriptDirectory.from_config(config).get_current_head()
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == head
     settings.database_url = migration_url
     command.downgrade(config, 'base')
     print('ACL_COPY_UPGRADE_ROLLBACK_AND_HISTORY_PASSED', flush=True)
