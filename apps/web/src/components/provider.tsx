@@ -24,8 +24,17 @@ function subscribe(callback: () => void) {
   };
 }
 
+// Fallback when storage is blocked (private mode, disabled site data): the choice lives until reload.
+let memoryLanguage: string | null = null;
+
 function snapshot() {
-  return localStorage.getItem("nexora-language") === "en" ? "en" : "ru";
+  let stored: string | null = memoryLanguage;
+  try {
+    stored = localStorage.getItem("nexora-language") ?? memoryLanguage;
+  } catch {
+    /* Storage unavailable: keep the in-memory choice. */
+  }
+  return stored === "en" ? "en" : "ru";
 }
 
 export function Provider({ children }: { children: React.ReactNode }) {
@@ -36,7 +45,12 @@ export function Provider({ children }: { children: React.ReactNode }) {
   }, [lang]);
 
   function setLang(value: string) {
-    localStorage.setItem("nexora-language", value);
+    memoryLanguage = value;
+    try {
+      localStorage.setItem("nexora-language", value);
+    } catch {
+      /* Storage unavailable: memoryLanguage keeps the choice for this page. */
+    }
     window.dispatchEvent(new Event("nexora-language"));
   }
 

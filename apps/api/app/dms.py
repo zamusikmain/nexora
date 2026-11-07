@@ -5,13 +5,14 @@ import hashlib
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import Field
+from pydantic import Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 
 from app.audit import audit
 from app.auth import Actor, Db
 from app.documents import document_data, get_document, require_scan, version_card_snapshot, version_data
+from app.idempotency import begin, finish
 from app.models import DocumentVersion, Favorite, FileScan, Folder, uid
 from app.policy import assert_read, require_write
 from app.schemas import Input
@@ -25,6 +26,18 @@ class FolderInput(Input):
     parent_id: str | None = Field(default=None, max_length=36)
 
 
+class FolderUpdate(Input):
+    expected_updated_at: datetime
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    parent_id: str | None = Field(default=None, max_length=36)
+
+    @model_validator(mode="after")
+    def valid_patch(self):
+        if "name" in self.model_fields_set and self.name is None:
+            raise ValueError("null_field")
+        return self
+
+
 class Move(Input):
     folder_id: str | None = Field(default=None, max_length=36)
     expected_revision: int = Field(ge=1)
@@ -35,7 +48,7 @@ class Revision(Input):
 
 
 def folder_data(folder: Folder) -> dict:
-    return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "owner_id": folder.owner_id}
+    return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "owner_id": folder.owner_id, "updated_at": folder.updated_at}
 
 
 def get_folder(db: Db, user: Actor, folder_id: str) -> Folder:
@@ -79,8 +92,12 @@ def breadcrumbs(folder_id: str, db: Db, user: Actor) -> list[dict]:
 
 @router.post("/folders", status_code=201)
 def create_folder(body: FolderInput, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     # Serialize all mutations of one owner's tree, including creation and moves.
     db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:owner, 0))"), {"owner": user.id})
+    if replay is not None:
+        get_folder(db, user, replay["id"])
+        return replay
     if body.parent_id:
         parent = get_folder(db, user, body.parent_id)
         if parent.owner_id != user.id:
@@ -91,15 +108,16 @@ def create_folder(body: FolderInput, request: Request, db: Db, user: Actor) -> d
     db.add(folder)
     db.flush()
     audit(db, request, user.id, "FOLDER_CREATED", "folder", folder.id)
-    db.commit()
-    return folder_data(folder)
+    return finish(db, folder_data(folder))
 
 
 @router.patch("/folders/{folder_id}")
-def move_folder(folder_id: str, body: FolderInput, request: Request, db: Db, user: Actor) -> dict:
+def move_folder(folder_id: str, body: FolderUpdate, request: Request, db: Db, user: Actor) -> dict:
     folder = get_folder(db, user, folder_id)
     db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:owner, 0))"), {"owner": folder.owner_id})
     db.refresh(folder)
+    if body.expected_updated_at != folder.updated_at:
+        raise HTTPException(409, "stale_record")
     if body.parent_id:
         parent = get_folder(db, user, body.parent_id)
         if parent.owner_id != folder.owner_id:
@@ -117,7 +135,11 @@ def move_folder(folder_id: str, body: FolderInput, request: Request, db: Db, use
         )
         if len(ancestors) + depth > 32:
             raise HTTPException(409, "folder_depth")
-    folder.name, folder.parent_id = body.name, body.parent_id
+    for key in ("name", "parent_id"):
+        if key in body.model_fields_set:
+            setattr(folder, key, getattr(body, key))
+    if not db.is_modified(folder):
+        return folder_data(folder)
     audit(db, request, user.id, "FOLDER_UPDATED", "folder", folder.id, {"parent_id": body.parent_id})
     db.commit()
     return folder_data(folder)
@@ -125,8 +147,11 @@ def move_folder(folder_id: str, body: FolderInput, request: Request, db: Db, use
 
 @router.post("/documents/{doc_id}/move")
 def move_document(doc_id: str, body: Move, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     require_write(user, doc)
+    if replay is not None:
+        return replay
     check_revision(doc, body.expected_revision)
     if body.folder_id:
         folder = get_folder(db, user, body.folder_id)
@@ -135,8 +160,7 @@ def move_document(doc_id: str, body: Move, request: Request, db: Db, user: Actor
     doc.folder_id = body.folder_id
     doc.revision += 1
     audit(db, request, user.id, "DOCUMENT_MOVED", "document", doc.id, {"folder_id": body.folder_id})
-    db.commit()
-    return document_data(doc)
+    return finish(db, document_data(doc))
 
 
 @router.put("/documents/{doc_id}/favorite", status_code=204)
@@ -157,8 +181,11 @@ def unfavorite(doc_id: str, db: Db, user: Actor):
 
 @router.post("/documents/{doc_id}/trash")
 def trash(doc_id: str, body: Revision, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     require_owner(user, doc)
+    if replay is not None:
+        return replay
     check_revision(doc, body.expected_revision)
     if doc.deleted_at is not None or doc.status not in {
         "DRAFT",
@@ -171,30 +198,34 @@ def trash(doc_id: str, body: Revision, request: Request, db: Db, user: Actor) ->
     doc.deleted_at = datetime.now(UTC)
     doc.revision += 1
     audit(db, request, user.id, "DOCUMENT_TRASHED", "document", doc.id)
-    db.commit()
-    return document_data(doc)
+    return finish(db, document_data(doc))
 
 
 @router.post("/documents/{doc_id}/restore")
 def restore_document(doc_id: str, body: Revision, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     require_owner(user, doc)
+    if replay is not None:
+        return replay
     check_revision(doc, body.expected_revision)
     if doc.deleted_at is None:
         raise HTTPException(409, "invalid_transition")
     doc.deleted_at = None
     doc.revision += 1
     audit(db, request, user.id, "DOCUMENT_RESTORED", "document", doc.id)
-    db.commit()
-    return document_data(doc)
+    return finish(db, document_data(doc))
 
 
 @router.post("/documents/{doc_id}/versions/{version_id}/restore", status_code=201)
 def restore_version(
     doc_id: str, version_id: str, body: Revision, request: Request, db: Db, user: Actor
 ) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = get_document(db, user, doc_id, lock=True)
     require_write(user, doc)
+    if replay is not None:
+        return replay
     check_revision(doc, body.expected_revision)
     source = db.scalar(
         select(DocumentVersion).where(DocumentVersion.id == version_id, DocumentVersion.document_id == doc_id)
@@ -258,8 +289,7 @@ def restore_version(
         doc.id,
         {"source_version_id": source.id, "version_id": version.id},
     )
-    db.commit()
-    return version_data(version)
+    return finish(db, version_data(version))
 
 
 @router.get("/documents/{doc_id}/versions/{version_id}/diff/{other_id}")

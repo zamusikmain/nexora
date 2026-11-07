@@ -1,0 +1,87 @@
+{
+  "source_commit": "34151f79ceac89348fed0b93fa807ccdb9c452c3",
+  "branch": "feature/nexora-workflow-hardening",
+  "date": "2026-10-11",
+  "quality": {
+    "markdown_links": 527,
+    "requirements": {
+      "BR": 8,
+      "FR": 18,
+      "NFR": 10,
+      "US": 18
+    },
+    "endpoints": 58,
+    "paths": 49,
+    "tables": 24,
+    "fields": 195,
+    "secret_flags": [],
+    "errors": []
+  },
+  "parsers": {
+    "mermaid": [
+      "access-check.mmd",
+      "architecture.mmd",
+      "create-document.mmd",
+      "data-model.mmd",
+      "decision.mmd",
+      "start-workflow.mmd",
+      "root README block"
+    ],
+    "bpmn": [
+      {
+        "file": "access-management.bpmn",
+        "warnings": 0,
+        "elements": 71
+      },
+      {
+        "file": "approval.bpmn",
+        "warnings": 0,
+        "elements": 59
+      },
+      {
+        "file": "create-document.bpmn",
+        "warnings": 0,
+        "elements": 35
+      },
+      {
+        "file": "rejection-resubmit.bpmn",
+        "warnings": 0,
+        "elements": 55
+      }
+    ],
+    "openapi": {
+      "version": "3.1.0",
+      "paths": 49,
+      "operations": 58
+    }
+  },
+  "bpmn_editor": {
+    "tool": "bpmn-js Modeler 18.31.0",
+    "imported": 4,
+    "warnings": 0,
+    "svg_export": 4
+  },
+  "backend_ops": {
+    "unique_passed": 162,
+    "failed": 1,
+    "integration_skipped": 363,
+    "failed_test": "ops/tests/test_backup.py::test_backup_script_archives_real_private_keys",
+    "reason": "Windows fixture interpolates unescaped path; unicodeescape SyntaxError"
+  },
+  "frontend": {
+    "passed": 5,
+    "typecheck": "passed",
+    "lint": "passed",
+    "production_build": "passed"
+  },
+  "ruff": "passed",
+  "mypy": "passed, 22 source files",
+  "not_run": [
+    "PostgreSQL integration",
+    "live schema comparison",
+    "migrations",
+    "DB+files restore",
+    "PlantUML render",
+    "application browser RU/EN UAT"
+  ]
+}

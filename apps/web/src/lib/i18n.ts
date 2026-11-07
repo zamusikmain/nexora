@@ -11,6 +11,7 @@ export const ru: Record<string, string> = {
   SESSION_REVOKED: "Сеанс завершён",
   SESSIONS_REVOKED: "Сеансы завершены",
   SESSIONS_PRUNED: "Завершены лишние сеансы",
+  AUTH_CLEANUP_COMPLETED: "Удалены истёкшие сеансы и счётчики входа",
   file_scan_required:
     "Эта версия ещё не имеет подтверждённой антивирусной проверки. Обратитесь к администратору.",
   scanEnabled: "Файл проверяется антивирусом до публикации версии.",
@@ -285,6 +286,7 @@ export const ru: Record<string, string> = {
   file_unavailable: "Файл временно недоступен",
   server_error: "Ошибка сервера. Попробуйте позже",
   login_rate_limited: "Слишком много попыток входа. Повторите через 15 минут",
+  login_temporarily_unavailable: "Вход временно недоступен. Повторите попытку",
   self_admin_change: "Нельзя менять собственные административные права",
   invalid_department: "Подразделение не найдено",
   invalid_document_type: "Тип документа не найден",
@@ -302,6 +304,7 @@ export const en: Record<string, string> = {
   SESSION_REVOKED: "Session revoked",
   SESSIONS_REVOKED: "Sessions revoked",
   SESSIONS_PRUNED: "Excess sessions revoked",
+  AUTH_CLEANUP_COMPLETED: "Expired sessions and login counters purged",
   file_scan_required:
     "This version has no confirmed malware scan. Contact your administrator.",
   scanEnabled: "Files are scanned before a version is published.",
@@ -576,6 +579,7 @@ export const en: Record<string, string> = {
   file_unavailable: "File temporarily unavailable",
   server_error: "Server error. Try again later",
   login_rate_limited: "Too many login attempts. Retry in 15 minutes",
+  login_temporarily_unavailable: "Sign-in is temporarily unavailable. Please retry",
   self_admin_change: "Cannot change your own administrative access",
   invalid_department: "Department not found",
   invalid_document_type: "Document type not found",
@@ -638,4 +642,25 @@ Object.assign(en, {
   ACCESS_REQUESTED: "Access requested", ACCESS_ENDORSED: "Access endorsed", ACCESS_ACTIVATED: "Access activated",
   ACCESS_REVOKED: "Access revoked", ACCESS_EXPIRED: "Access expired", RECEIPT_REVOKED: "Receipt access revoked",
   DEPARTMENT_REVIEW_UPDATED: "Department draft policy updated",
+});
+
+Object.assign(ru, {
+  idempotency_key_required: "Для операции требуется ключ повторного запроса.",
+  invalid_idempotency_key: "Некорректный ключ операции.",
+  stale_record: "Запись изменена другим пользователем. Обновите страницу.",
+  required_workflow: "Для этого типа документа требуется обязательный маршрут.",
+  required_stage_condition: "Обязательный маршрут не может пропускать этапы по условиям.",
+  unauthorized_reviewer: "Согласующий больше не соответствует правилам маршрута.",
+  workflow_scope_changed: "Версия или состав маршрута изменились. Требуется проверка.",
+  WORKFLOW_REQUIREMENT_UPDATED: "Обязательный маршрут обновлён",
+});
+Object.assign(en, {
+  idempotency_key_required: "An operation retry key is required.",
+  invalid_idempotency_key: "Invalid operation key.",
+  stale_record: "Another user changed this record. Refresh the page.",
+  required_workflow: "This document type requires its configured workflow.",
+  required_stage_condition: "A required workflow cannot skip stages using conditions.",
+  unauthorized_reviewer: "The reviewer no longer satisfies the workflow rules.",
+  workflow_scope_changed: "The version or workflow assignments changed. Review is required.",
+  WORKFLOW_REQUIREMENT_UPDATED: "Required workflow updated",
 });

@@ -12,6 +12,7 @@ from sqlalchemy import func, or_, select
 
 from app.audit import audit
 from app.auth import Actor, Db
+from app.idempotency import begin, finish
 from app.models import (
     AccessGrant,
     AclAuthority,
@@ -185,19 +186,22 @@ def prepare_grant(db: Db, user: Actor, doc: Document, body: GrantInput, purpose:
 
 @router.post("/documents/{doc_id}/access-requests", status_code=201)
 def create_grant(doc_id: str, body: GrantInput, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = locked_doc(db, doc_id)
     if not may_manage(db, user, doc):
         raise HTTPException(404, "not_found")
+    if replay is not None:
+        return replay
     grant = prepare_grant(db, user, doc, body)
     audit(db, request, user.id, "ACCESS_REQUESTED", "access_grant", grant.id)
     if grant.status == "ACTIVE":
         audit(db, request, user.id, "ACCESS_ACTIVATED", "access_grant", grant.id)
-    db.commit()
-    return grant_data(grant)
+    return finish(db, grant_data(grant))
 
 
 @router.post("/approvals/{approval_id}/access-requests", status_code=201)
 def request_own_access(approval_id: str, body: OwnAccessInput, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     approval = db.get(Approval, approval_id)
     if approval is None or approval.user_id != user.id:
         raise HTTPException(404, "not_found")
@@ -206,13 +210,14 @@ def request_own_access(approval_id: str, body: OwnAccessInput, request: Request,
     doc = locked_doc(db, instance.document_id)
     if doc.confidentiality != "RESTRICTED" or not set(body.actions) <= {"card", "file", "snapshot"}:
         raise HTTPException(422, "invalid_grant_actions")
+    if replay is not None:
+        return replay
     grant = prepare_grant(db, user, doc, GrantInput(
         recipient_id=user.id, version_id=instance.document_version_id, approval_id=approval.id,
         purpose=body.purpose, actions=body.actions, reason=body.reason, hours=body.hours,
     ))
     audit(db, request, user.id, "ACCESS_REQUESTED", "access_grant", grant.id)
-    db.commit()
-    return grant_data(grant)
+    return finish(db, grant_data(grant))
 
 
 def visible_grant(db: Db, user: Actor, grant: AccessGrant, doc: Document) -> bool:
@@ -248,6 +253,7 @@ def grants(request: Request, db: Db, user: Actor, page: int = Query(1, ge=1)) ->
 
 @router.post("/access/grants/{grant_id}/endorse")
 def endorse(grant_id: str, body: EndorseInput, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     initial = db.get(AccessGrant, grant_id)
     if initial is None:
         raise HTTPException(404, "not_found")
@@ -259,6 +265,8 @@ def endorse(grant_id: str, body: EndorseInput, request: Request, db: Db, user: A
         raise HTTPException(404, "not_found")
     if user.id in {grant.requested_by, grant.recipient_id}:
         raise HTTPException(403, "self_approval_forbidden")
+    if replay is not None:
+        return replay
     if body.scope_hash != grant.scope_hash:
         raise HTTPException(409, "grant_scope_changed")
     now = datetime.now(UTC)
@@ -294,8 +302,7 @@ def endorse(grant_id: str, body: EndorseInput, request: Request, db: Db, user: A
         grant.status, grant.activated_at = "ACTIVE", now
         grant.expires_at = now + timedelta(hours=grant.duration_hours)
         audit(db, request, user.id, "ACCESS_ACTIVATED", "access_grant", grant.id)
-    db.commit()
-    return grant_data(grant)
+    return finish(db, grant_data(grant))
 
 
 @router.post("/access/grants/{grant_id}/revoke")
@@ -332,10 +339,13 @@ def review_policy(department_id: str, body: ReviewPolicyInput, request: Request,
 
 @router.post("/documents/{doc_id}/department-review", status_code=201)
 def share_draft(doc_id: str, body: DraftShareInput, request: Request, db: Db, user: Actor) -> dict:
+    replay = begin(db, user, request, body.model_dump(mode="json"))
     doc = locked_doc(db, doc_id)
     policy = db.get(DepartmentReviewPolicy, doc.department_id) if doc.department_id else None
     if doc.owner_id != user.id:
         raise HTTPException(404, "not_found")
+    if replay is not None:
+        return replay
     if not policy or not policy.enabled:
         raise HTTPException(409, "department_review_disabled")
     if doc.confidentiality not in {"PUBLIC", "INTERNAL"} or doc.status not in {"DRAFT", "REVISION_REQUIRED"} \
@@ -351,8 +361,7 @@ def share_draft(doc_id: str, body: DraftShareInput, request: Request, db: Db, us
         ), purpose="draft")
         created.append(grant_data(grant))
         audit(db, request, user.id, "ACCESS_ACTIVATED", "access_grant", grant.id)
-    db.commit()
-    return {"items": created}
+    return finish(db, {"items": created})
 
 
 @router.post("/approvals/{approval_id}/receipt/revoke")

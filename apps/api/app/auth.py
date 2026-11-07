@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.audit import audit
+from app.client_ip import client_address
 from app.config import settings
 from app.db import get_db
 from app.models import AuthSession, LoginThrottle, User
@@ -54,24 +55,36 @@ def public_user(user: User) -> dict[str, str | None]:
         "role": user.role,
         "status": user.status,
         "department_id": user.department_id,
+        "updated_at": user.updated_at.isoformat(),
     }
 
 
 @router.post("/login", response_model=SessionOut)
 def login(body: Login, request: Request, response: Response, db: Db) -> dict:
     now = datetime.now(UTC)
-    # Per-account and per-direct-peer limits. Never trust forwarded client IP headers.
-    keys = [
-        digest("account:" + body.email.lower()),
-        digest("peer:" + (request.client.host if request.client else "unknown")),
-    ]
+    # Per-account and per-client limits. X-Forwarded-For is honoured only from TRUSTED_PROXIES;
+    # an undeterminable client gets no shared bucket, so one attacker cannot lock out everyone.
+    keys = [digest("account:" + body.email.lower())]
+    client = client_address(
+        request.client.host if request.client else None,
+        request.headers.get("x-forwarded-for"),
+        settings().trusted_proxies,
+    )
+    if client:
+        keys.append(digest("peer:" + client))
     buckets = []
     for key in sorted(keys):
-        db.execute(
-            insert(LoginThrottle).values(id=key, failures=0, window_start=now).on_conflict_do_nothing()
-        )
-        bucket = db.scalar(select(LoginThrottle).where(LoginThrottle.id == key).with_for_update())
-        assert bucket is not None
+        bucket = None
+        # The operator purge (app.auth_cleanup) may delete a stale row between insert and lock.
+        for _ in range(3):
+            db.execute(
+                insert(LoginThrottle).values(id=key, failures=0, window_start=now).on_conflict_do_nothing()
+            )
+            bucket = db.scalar(select(LoginThrottle).where(LoginThrottle.id == key).with_for_update())
+            if bucket is not None:
+                break
+        if bucket is None:
+            raise HTTPException(503, "login_temporarily_unavailable")
         if bucket.window_start + timedelta(minutes=15) <= now:
             bucket.window_start, bucket.failures = now, 0
         buckets.append(bucket)

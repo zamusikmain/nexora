@@ -386,3 +386,19 @@ class ReceiptRevocation(Base):
     reason: Mapped[str] = mapped_column(String(1000))
     hide_receipt: Mapped[bool] = mapped_column(Boolean, default=False)
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class OperationKey(Base):
+    __tablename__ = "operation_keys"
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    key: Mapped[str] = mapped_column(String(36), primary_key=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    response: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WorkflowRequirement(Base):
+    __tablename__ = "workflow_requirements"
+    type_id: Mapped[str] = mapped_column(ForeignKey("document_types.id"), primary_key=True)
+    template_id: Mapped[str] = mapped_column(ForeignKey("workflow_templates.id"))
+    reviewer_roles: Mapped[list[str]] = mapped_column(JSON)

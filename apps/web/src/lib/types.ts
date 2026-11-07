@@ -1,4 +1,5 @@
 export type User = {
+  updated_at: string;
   id: string;
   email: string;
   display_name: string;
@@ -21,6 +22,7 @@ export type CustomField = {
   max_length: number;
 };
 export type Catalog = {
+  updated_at?: string;
   metadata_schema?: { fields?: CustomField[] };
   id: string;
   code: string;
@@ -28,6 +30,7 @@ export type Catalog = {
   name_en: string;
 };
 export type Folder = {
+  updated_at: string;
   id: string;
   name: string;
   parent_id: string | null;

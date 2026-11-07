@@ -16,7 +16,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     api<{ user: User; csrf_token: string }>("/auth/me")
       .then((data) => {
-        setCsrf(data.csrf_token);
+        setCsrf(data.csrf_token, data.user.id);
         setUser(data.user);
       })
       .catch(() => setError("unauthorized"));
