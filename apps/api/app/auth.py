@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.audit import audit
+from app.client_ip import client_address
 from app.config import settings
 from app.db import get_db
 from app.models import AuthSession, LoginThrottle, User
@@ -61,11 +62,16 @@ def public_user(user: User) -> dict[str, str | None]:
 @router.post("/login", response_model=SessionOut)
 def login(body: Login, request: Request, response: Response, db: Db) -> dict:
     now = datetime.now(UTC)
-    # Per-account and per-direct-peer limits. Never trust forwarded client IP headers.
-    keys = [
-        digest("account:" + body.email.lower()),
-        digest("peer:" + (request.client.host if request.client else "unknown")),
-    ]
+    # Per-account and per-client limits. X-Forwarded-For is honoured only from TRUSTED_PROXIES;
+    # an undeterminable client gets no shared bucket, so one attacker cannot lock out everyone.
+    keys = [digest("account:" + body.email.lower())]
+    client = client_address(
+        request.client.host if request.client else None,
+        request.headers.get("x-forwarded-for"),
+        settings().trusted_proxies,
+    )
+    if client:
+        keys.append(digest("peer:" + client))
     buckets = []
     for key in sorted(keys):
         db.execute(
