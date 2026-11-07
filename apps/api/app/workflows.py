@@ -5,7 +5,6 @@ import json
 import math
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.encoders import jsonable_encoder
@@ -17,7 +16,7 @@ from app.access import receipt_data
 from app.audit import audit
 from app.auth import Actor, Db
 from app.documents import document_data, document_projection, get_document, require_scan, version_data
-from app.idempotency import begin, finish, workflow_lock
+from app.idempotency import begin, finish, workflow_key, workflow_lock
 from app.models import (
     AccessGrant,
     Approval,
@@ -97,13 +96,14 @@ class TemplateInput(Input):
 class Start(Input):
     template_id: str = Field(min_length=1, max_length=36)
     expected_revision: int = Field(ge=1)
-    idempotency_key: UUID
+    # Signed retry key from POST /operation-keys (or a legacy UUID during the transition).
+    idempotency_key: str = Field(min_length=1, max_length=512)
 
 
 class Decision(Input):
     action: Literal["approve", "reject", "revision", "cancel"]
     comment: str = Field(default="", max_length=2000)
-    idempotency_key: UUID
+    idempotency_key: str = Field(min_length=1, max_length=512)
 
 
 def template_data(t: WorkflowTemplate) -> dict:
@@ -201,10 +201,10 @@ def request_hash(instance_or_doc: str, body: Input) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
 
 
-def previous(db: Db, user: Actor, key: UUID, fingerprint: str) -> WorkflowEvent | None:
+def previous(db: Db, user: Actor, key: str, fingerprint: str) -> WorkflowEvent | None:
     event = db.scalar(
         select(WorkflowEvent).where(
-            WorkflowEvent.actor_id == user.id, WorkflowEvent.idempotency_key == str(key)
+            WorkflowEvent.actor_id == user.id, WorkflowEvent.idempotency_key == key
         )
     )
     if event and event.request_hash != fingerprint:
@@ -277,7 +277,7 @@ def commit_event(
     instance: WorkflowInstance,
     action: str,
     comment: str,
-    key: UUID,
+    key: str,
     fingerprint: str,
     previous_state: str,
 ):
@@ -289,7 +289,7 @@ def commit_event(
             comment=comment,
             previous_state=previous_state,
             new_state=instance.status,
-            idempotency_key=str(key),
+            idempotency_key=key,
             request_hash=fingerprint,
         )
     )
@@ -327,12 +327,13 @@ def document_workflows(doc_id: str, db: Db, user: Actor) -> list[dict]:
 
 @router.post("/documents/{doc_id}/workflows", status_code=201)
 def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> dict:
-    workflow_lock(db, user, body.idempotency_key)
+    key = workflow_key(body.idempotency_key, user)
+    workflow_lock(db, user, key)
     doc = get_document(db, user, doc_id, lock=True)
     if doc.owner_id != user.id:
         raise HTTPException(403, "forbidden")
     fingerprint = request_hash(doc_id, body)
-    event = previous(db, user, body.idempotency_key, fingerprint)
+    event = previous(db, user, key, fingerprint)
     if event:
         restored = db.get(WorkflowInstance, event.instance_id)
         assert restored is not None
@@ -417,13 +418,14 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
             )
     doc.status = "IN_APPROVAL"
     doc.revision += 1
-    commit_event(db, request, user, instance, "STARTED", "", body.idempotency_key, fingerprint, "NONE")
+    commit_event(db, request, user, instance, "STARTED", "", key, fingerprint, "NONE")
     return instance_data(instance, db, user)
 
 
 @router.post("/workflows/{instance_id}/decisions")
 def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Actor) -> dict:
-    workflow_lock(db, user, body.idempotency_key)
+    key = workflow_key(body.idempotency_key, user)
+    workflow_lock(db, user, key)
     # Same lock ordering for start, decisions, document edits and cancellation.
     row = db.get(WorkflowInstance, instance_id)
     if row is None:
@@ -433,13 +435,13 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
     instance = db.scalar(select(WorkflowInstance).where(WorkflowInstance.id == instance_id).with_for_update().execution_options(populate_existing=True))
     assert instance is not None
     fingerprint = request_hash(instance_id, body)
-    event = previous(db, user, body.idempotency_key, fingerprint)
+    event = previous(db, user, key, fingerprint)
     if event:
         if doc.owner_id == user.id:
             return instance_data(instance, db, user)
         saved = db.scalar(select(ReviewReceipt).join(Approval, Approval.id == ReviewReceipt.approval_id).where(
             ReviewReceipt.actor_id == user.id, Approval.instance_id == instance.id,
-            ReviewReceipt.idempotency_key == str(body.idempotency_key),
+            ReviewReceipt.idempotency_key == key,
         ))
         if not saved:
             raise HTTPException(404, "not_found")
@@ -529,7 +531,7 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
         saved = ReviewReceipt(approval_id=mine.id, actor_id=user.id,
                               version_id=instance.document_version_id, outcome=mine.status,
                               process_status=instance.status, acted_at=mine.acted_at,
-                              idempotency_key=str(body.idempotency_key),
+                              idempotency_key=key,
                               snapshot={"version_id": instance.document_version_id,
                                         "title": instance.metadata_snapshot["title"], "own_comment": body.comment})
         db.add(saved)
@@ -543,7 +545,7 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
             body.action
         ],
         body.comment,
-        body.idempotency_key,
+        key,
         fingerprint,
         old,
     )

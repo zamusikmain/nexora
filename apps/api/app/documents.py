@@ -85,6 +85,19 @@ def document_data(doc: Document) -> dict[str, Any]:
     }
 
 
+CLASSIFICATION_RANK = {"PUBLIC": 0, "INTERNAL": 1, "CONFIDENTIAL": 2, "RESTRICTED": 3}
+
+
+def classification_lowered(doc: Document, new: str | None) -> bool:
+    """Lowering selects a milder required route, so it is allowed only before the first file.
+
+    RESTRICTED can never be lowered. Raising is always allowed.
+    """
+    if new is None or CLASSIFICATION_RANK[new] >= CLASSIFICATION_RANK[doc.confidentiality]:
+        return False
+    return doc.confidentiality == "RESTRICTED" or doc.current_version_id is not None
+
+
 def get_document(db: Db, user: Actor, doc_id: str, lock: bool = False,
                  action: str = "card", version_id: str | None = None) -> Document:
     query = select(Document).where(Document.id == doc_id)
@@ -255,8 +268,7 @@ def update_document(doc_id: str, body: DocumentUpdate, request: Request, db: Db,
     if doc_type is None:
         raise HTTPException(422, "invalid_document_type")
     supplied = metadata_values(body, db)
-    if doc.confidentiality == "RESTRICTED" and "confidentiality" in body.model_fields_set \
-            and body.confidentiality != "RESTRICTED":
+    if "confidentiality" in body.model_fields_set and classification_lowered(doc, body.confidentiality):
         raise HTTPException(403, "classification_change_forbidden")
     merged = {key: supplied[key] if key in body.model_fields_set else getattr(doc, key) for key in supplied}
     try:
