@@ -1,0 +1,53 @@
+@startuml
+left to right direction
+actor "ACTIVE пользователь" as User
+actor "Владелец документа" as Owner
+actor "Назначенный участник" as Reviewer
+actor "MANAGER" as Manager
+actor "ADMIN" as Admin
+actor "CUSTODIAN office" as Custodian
+actor "SECURITY office" as Security
+actor "Оператор" as Operator
+Owner --|> User
+Reviewer --|> User
+Manager --|> User
+Admin --|> User
+Custodian --|> User
+Security --|> User
+rectangle NEXORA {
+ usecase "Войти / управлять своими сессиями" as Login
+ usecase "Зарегистрировать документ" as Create
+ usecase "Править карточку / загружать версию" as Edit
+ usecase "Читать разрешённый документ" as Read
+ usecase "Проверить server ACL" as ACL
+ usecase "Запустить / отменить процесс" as Start
+ usecase "Принять решение текущего этапа" as Decide
+ usecase "Читать собственную квитанцию" as Receipt
+ usecase "Запросить / отозвать допуск" as Grant
+ usecase "Подтвердить RESTRICTED допуск" as Endorse
+ usecase "Управлять пользователями / шаблонами" as Manage
+ usecase "Provision offices / DB roles / backup" as Ops
+}
+User --> Login
+User --> Create
+User --> Read
+Owner --> Edit
+Owner --> Start
+Owner --> Grant
+Reviewer --> Decide
+Reviewer --> Receipt
+Reviewer --> Grant
+Manager --> Read
+Admin --> Manage
+Custodian --> Endorse
+Security --> Endorse
+Operator --> Ops
+Read .> ACL : <<include>>
+Decide .> ACL : <<include>>
+Edit .> ACL : <<include>>
+note right of Endorse
+ Different actors and offices;
+ no requester/recipient self-approval.
+ Office does not imply content access.
+end note
+@enduml

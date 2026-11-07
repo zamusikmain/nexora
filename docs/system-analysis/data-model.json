@@ -1,0 +1,3269 @@
+[
+  {
+    "name": "access_grants",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "document_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.document_id",
+          "documents.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "version_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "recipient_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "requested_by",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "recipient_role",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "recipient_department_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "department_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "classification",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "purpose",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "instance_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_instances.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "approval_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "approvals.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "can_card",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "can_file",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "can_snapshot",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "can_comments",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "can_history",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "can_compare",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "reason",
+        "type": "VARCHAR(1000)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "duration_hours",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "scope_hash",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "PENDING",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "requested_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "review_deadline",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "activated_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "expires_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "revoked_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "snapshot",
+        "type": "JSON",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "grant_duration",
+        "columns": [],
+        "sql": "duration_hours > 0 AND duration_hours <= 168"
+      },
+      {
+        "kind": "CheckConstraint",
+        "name": "grant_purpose",
+        "columns": [],
+        "sql": "purpose IN ('personal','review','audit_snapshot','draft','incident')"
+      },
+      {
+        "kind": "CheckConstraint",
+        "name": "grant_status",
+        "columns": [],
+        "sql": "status IN ('PENDING','ACTIVE','DENIED','REVOKED','EXPIRED')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "instance_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "recipient_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "approval_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "requested_by"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "document_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": "fk_grant_version",
+        "columns": [
+          "document_id",
+          "version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_grants_recipient_document",
+        "unique": false,
+        "columns": [
+          "recipient_id",
+          "document_id",
+          "status",
+          "expires_at"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "acl_authorities",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "user_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "department_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "departments.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "office",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "active",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "True",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "expires_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "acl_authority_office",
+        "columns": [],
+        "sql": "office IN ('CUSTODIAN','SECURITY')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "department_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "user_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_acl_authority",
+        "columns": [
+          "user_id",
+          "department_id",
+          "office"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_acl_authorities_user_id",
+        "unique": false,
+        "columns": [
+          "user_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "acl_department_policies",
+    "columns": [
+      {
+        "name": "department_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "departments.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "enabled",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "updated_by",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "updated_by"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "department_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "department_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "approvals",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "instance_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_instances.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "stage",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "user_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "due_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "acted_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "approval_status",
+        "columns": [],
+        "sql": "status IN ('WAITING','PENDING','APPROVED','REJECTED','REVISION_REQUIRED','CANCELLED')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "instance_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "user_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_approval_assignee",
+        "columns": [
+          "instance_id",
+          "stage",
+          "user_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_approvals_instance_id",
+        "unique": false,
+        "columns": [
+          "instance_id"
+        ]
+      },
+      {
+        "name": "ix_approvals_user_status_due",
+        "unique": false,
+        "columns": [
+          "user_id",
+          "status",
+          "due_at"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "audit_events",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "action",
+        "type": "VARCHAR(60)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "target_type",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "target_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "safe_metadata",
+        "type": "JSON",
+        "nullable": false,
+        "default": "dict",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "request_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_audit_events_action",
+        "unique": false,
+        "columns": [
+          "action"
+        ]
+      },
+      {
+        "name": "ix_audit_events_created_at",
+        "unique": false,
+        "columns": [
+          "created_at"
+        ]
+      },
+      {
+        "name": "ix_audit_events_target_id",
+        "unique": false,
+        "columns": [
+          "target_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "auth_sessions",
+    "columns": [
+      {
+        "name": "public_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "user_agent",
+        "type": "VARCHAR(200)",
+        "nullable": false,
+        "default": "",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "id",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "user_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "csrf_token",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "expires_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "user_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_auth_session_public_id",
+        "columns": [
+          "public_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_auth_sessions_expires_at",
+        "unique": false,
+        "columns": [
+          "expires_at"
+        ]
+      },
+      {
+        "name": "ix_auth_sessions_user_id",
+        "unique": false,
+        "columns": [
+          "user_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "comments",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "document_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "documents.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "author_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "body",
+        "type": "VARCHAR(4000)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "version_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "instance_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_instances.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "stage",
+        "type": "INTEGER",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "document_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "instance_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "author_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_comments_document_id",
+        "unique": false,
+        "columns": [
+          "document_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "departments",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "code",
+        "type": "VARCHAR(40)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": true,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_ru",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_en",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": null,
+        "columns": [
+          "code"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "document_favorites",
+    "columns": [
+      {
+        "name": "user_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "document_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "documents.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "document_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "user_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "user_id",
+          "document_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "document_types",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "code",
+        "type": "VARCHAR(40)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": true,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_ru",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_en",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "metadata_schema",
+        "type": "JSON",
+        "nullable": false,
+        "default": "dict",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": null,
+        "columns": [
+          "code"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "document_versions",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "document_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "documents.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "version_number",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "original_filename",
+        "type": "VARCHAR(200)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "storage_key",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": true,
+        "default_kind": "none"
+      },
+      {
+        "name": "mime_type",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "size",
+        "type": "BIGINT",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_by",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "change_note",
+        "type": "VARCHAR(1000)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "metadata_snapshot",
+        "type": "JSON",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "version_positive",
+        "columns": [],
+        "sql": "version_number > 0 AND size > 0"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "document_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "created_by"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": null,
+        "columns": [
+          "storage_key"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_document_version_identity",
+        "columns": [
+          "document_id",
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_document_version_number",
+        "columns": [
+          "document_id",
+          "version_number"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_document_versions_document_id",
+        "unique": false,
+        "columns": [
+          "document_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "documents",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [
+          "document_versions.document_id"
+        ],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "number",
+        "type": "VARCHAR(40)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": true,
+        "default_kind": "none"
+      },
+      {
+        "name": "title",
+        "type": "VARCHAR(240)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "type_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_types.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "owner_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "department_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "departments.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "DRAFT",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "business_metadata",
+        "type": "JSON",
+        "nullable": false,
+        "default": "dict",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "current_version_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "description",
+        "type": "VARCHAR(4000)",
+        "nullable": false,
+        "default": "",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "category",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "tags",
+        "type": "JSON",
+        "nullable": false,
+        "default": "[]",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "responsible_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "confidentiality",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "INTERNAL",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "effective_date",
+        "type": "DATE",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "expiration_date",
+        "type": "DATE",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "folder_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "folders.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "deleted_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "revision",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "1",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "document_confidentiality",
+        "columns": [],
+        "sql": "confidentiality IN ('PUBLIC','INTERNAL','CONFIDENTIAL','RESTRICTED')"
+      },
+      {
+        "kind": "CheckConstraint",
+        "name": "document_dates",
+        "columns": [],
+        "sql": "effective_date IS NULL OR expiration_date IS NULL OR expiration_date >= effective_date"
+      },
+      {
+        "kind": "CheckConstraint",
+        "name": "document_status",
+        "columns": [],
+        "sql": "status IN ('DRAFT','SUBMITTED','IN_REVIEW','IN_APPROVAL','REVISION_REQUIRED','APPROVED','REJECTED','CANCELLED','ARCHIVED')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "owner_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "department_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "responsible_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "folder_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "type_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": "fk_document_current_version",
+        "columns": [
+          "id",
+          "current_version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": null,
+        "columns": [
+          "number"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_documents_deleted_at",
+        "unique": false,
+        "columns": [
+          "deleted_at"
+        ]
+      },
+      {
+        "name": "ix_documents_department_status",
+        "unique": false,
+        "columns": [
+          "department_id",
+          "status"
+        ]
+      },
+      {
+        "name": "ix_documents_folder_id",
+        "unique": false,
+        "columns": [
+          "folder_id"
+        ]
+      },
+      {
+        "name": "ix_documents_owner_id",
+        "unique": false,
+        "columns": [
+          "owner_id"
+        ]
+      },
+      {
+        "name": "ix_documents_responsible_id",
+        "unique": false,
+        "columns": [
+          "responsible_id"
+        ]
+      },
+      {
+        "name": "ix_documents_type_id",
+        "unique": false,
+        "columns": [
+          "type_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "file_scans",
+    "columns": [
+      {
+        "name": "version_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "sha256",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "engine",
+        "type": "VARCHAR(40)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "version_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "folders",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "name",
+        "type": "VARCHAR(120)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "owner_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "parent_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "folders.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "folder_not_self",
+        "columns": [],
+        "sql": "parent_id IS NULL OR parent_id <> id"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "parent_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "owner_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_folders_owner_id",
+        "unique": false,
+        "columns": [
+          "owner_id"
+        ]
+      },
+      {
+        "name": "ix_folders_parent_id",
+        "unique": false,
+        "columns": [
+          "parent_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "grant_endorsements",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "grant_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "access_grants.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "authority_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "acl_authorities.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "office",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "scope_hash",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "approved_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "grant_office",
+        "columns": [],
+        "sql": "office IN ('CUSTODIAN','SECURITY')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "authority_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "grant_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_grant_actor",
+        "columns": [
+          "grant_id",
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_grant_office",
+        "columns": [
+          "grant_id",
+          "office"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_grant_endorsements_grant_id",
+        "unique": false,
+        "columns": [
+          "grant_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "login_throttles",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "failures",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "0",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "window_start",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "operation_keys",
+    "columns": [
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "key",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "fingerprint",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "response",
+        "type": "JSON",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id",
+          "key"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "receipt_revocations",
+    "columns": [
+      {
+        "name": "approval_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "approvals.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "reason",
+        "type": "VARCHAR(1000)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "hide_receipt",
+        "type": "BOOLEAN",
+        "nullable": false,
+        "default": "False",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "revoked_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "approval_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "approval_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "review_receipts",
+    "columns": [
+      {
+        "name": "approval_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "approvals.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "version_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "outcome",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "process_status",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "idempotency_key",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "acted_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "snapshot",
+        "type": "JSON",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "approval_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "approval_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_receipt_request",
+        "columns": [
+          "actor_id",
+          "idempotency_key"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_review_receipts_actor_id",
+        "unique": false,
+        "columns": [
+          "actor_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "users",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "email",
+        "type": "VARCHAR(254)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": true,
+        "default_kind": "none"
+      },
+      {
+        "name": "display_name",
+        "type": "VARCHAR(100)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "password_hash",
+        "type": "VARCHAR(255)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "role",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "USER",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(20)",
+        "nullable": false,
+        "default": "ACTIVE",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "department_id",
+        "type": "VARCHAR(36)",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "departments.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "updated_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "user_role",
+        "columns": [],
+        "sql": "role IN ('USER','REVIEWER','APPROVER','LEGAL','MANAGER','ADMIN')"
+      },
+      {
+        "kind": "CheckConstraint",
+        "name": "user_status",
+        "columns": [],
+        "sql": "status IN ('ACTIVE','BLOCKED','DISABLED')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "department_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": null,
+        "columns": [
+          "email"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_users_department_id",
+        "unique": false,
+        "columns": [
+          "department_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "workflow_events",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "instance_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_instances.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "actor_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "action",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "comment",
+        "type": "VARCHAR(2000)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "previous_state",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "new_state",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "idempotency_key",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "request_hash",
+        "type": "VARCHAR(64)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "instance_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "actor_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_workflow_actor_request",
+        "columns": [
+          "actor_id",
+          "idempotency_key"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_workflow_events_instance_id",
+        "unique": false,
+        "columns": [
+          "instance_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "workflow_instances",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "document_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.document_id",
+          "documents.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "document_version_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "document_versions.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "template_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_templates.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "metadata_snapshot",
+        "type": "JSON",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "stage",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "0",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "status",
+        "type": "VARCHAR(30)",
+        "nullable": false,
+        "default": "RUNNING",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "started_by",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      },
+      {
+        "name": "completed_at",
+        "type": "DATETIME",
+        "nullable": true,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "workflow_status",
+        "columns": [],
+        "sql": "status IN ('RUNNING','APPROVED','REJECTED','REVISION_REQUIRED','CANCELLED')"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "template_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "started_by"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "document_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": "fk_workflow_document_version",
+        "columns": [
+          "document_id",
+          "document_version_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_workflow_instances_document_id",
+        "unique": false,
+        "columns": [
+          "document_id"
+        ]
+      },
+      {
+        "name": "uq_workflow_active_document",
+        "unique": true,
+        "columns": [
+          "document_id"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "workflow_requirements",
+    "columns": [
+      {
+        "name": "type_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": true,
+        "fk": [
+          "document_types.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "template_id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "workflow_templates.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "reviewer_roles",
+        "type": "JSON",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "template_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "type_id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "type_id"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "workflow_templates",
+    "columns": [
+      {
+        "name": "id",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "uid",
+        "pk": true,
+        "fk": [],
+        "unique": false,
+        "default_kind": "python"
+      },
+      {
+        "name": "code",
+        "type": "VARCHAR(40)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "version",
+        "type": "INTEGER",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_ru",
+        "type": "VARCHAR(120)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "name_en",
+        "type": "VARCHAR(120)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "definition",
+        "type": "JSON",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_by",
+        "type": "VARCHAR(36)",
+        "nullable": false,
+        "default": "—",
+        "pk": false,
+        "fk": [
+          "users.id"
+        ],
+        "unique": false,
+        "default_kind": "none"
+      },
+      {
+        "name": "created_at",
+        "type": "DATETIME",
+        "nullable": false,
+        "default": "now()",
+        "pk": false,
+        "fk": [],
+        "unique": false,
+        "default_kind": "server"
+      }
+    ],
+    "constraints": [
+      {
+        "kind": "CheckConstraint",
+        "name": "workflow_template_positive",
+        "columns": [],
+        "sql": "version > 0"
+      },
+      {
+        "kind": "ForeignKeyConstraint",
+        "name": null,
+        "columns": [
+          "created_by"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "PrimaryKeyConstraint",
+        "name": null,
+        "columns": [
+          "id"
+        ],
+        "sql": null
+      },
+      {
+        "kind": "UniqueConstraint",
+        "name": "uq_workflow_template_version",
+        "columns": [
+          "code",
+          "version"
+        ],
+        "sql": null
+      }
+    ],
+    "indexes": [
+      {
+        "name": "ix_workflow_templates_code",
+        "unique": false,
+        "columns": [
+          "code"
+        ]
+      }
+    ]
+  }
+]

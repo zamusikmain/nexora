@@ -1,0 +1,255 @@
+<?xml version='1.0' encoding='utf-8'?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_approval" targetNamespace="https://nexora.example/analysis" exporter="NEXORA code-derived documentation" exporterVersion="1">
+  <bpmn:process id="Process_approval" name="Согласование закреплённой версии" isExecutable="false">
+    <bpmn:documentation>AS-IS аналитическая модель; ошибки объединены в бизнес-ветки. Не engine configuration.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_approval">
+      <bpmn:lane id="Lane_approval_0" name="Владелец">
+        <bpmn:flowNodeRef>approval_start</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_send</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_approved</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_approval_1" name="API">
+        <bpmn:flowNodeRef>approval_validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_valid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_pin</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_all</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_next</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_error</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_approval_2" name="Текущие согласующие">
+        <bpmn:flowNodeRef>approval_decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_choice</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>approval_terminal</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="approval_start" name="Документ с файлом">
+      <bpmn:outgoing>Flow_approval_0</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="approval_send" name="Выбрать маршрут и запустить">
+      <bpmn:incoming>Flow_approval_0</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_1</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="approval_validate" name="Проверить owner, revision, scan, route">
+      <bpmn:incoming>Flow_approval_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="approval_valid" name="Разрешён start?">
+      <bpmn:incoming>Flow_approval_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_3</bpmn:outgoing>
+      <bpmn:outgoing>Flow_approval_4</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="approval_pin" name="Snapshot и план; current PENDING">
+      <bpmn:incoming>Flow_approval_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_5</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="approval_decision" name="Проверить pinned version и решить">
+      <bpmn:incoming>Flow_approval_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_6</bpmn:outgoing>
+      <bpmn:incoming>Flow_approval_11</bpmn:incoming>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="approval_choice" name="Решение?">
+      <bpmn:incoming>Flow_approval_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_approval_8</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="approval_all" name="Все этапы согласованы?">
+      <bpmn:incoming>Flow_approval_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_approval_10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="approval_next" name="Ждать остальных / открыть этап">
+      <bpmn:incoming>Flow_approval_10</bpmn:incoming>
+      <bpmn:outgoing>Flow_approval_11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="approval_approved" name="APPROVED, revoke grants">
+      <bpmn:incoming>Flow_approval_9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="approval_terminal" name="REJECTED / REVISION_REQUIRED">
+      <bpmn:incoming>Flow_approval_8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="approval_error" name="Ошибка, процесс не начат">
+      <bpmn:incoming>Flow_approval_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_approval_0" sourceRef="approval_start" targetRef="approval_send" />
+    <bpmn:sequenceFlow id="Flow_approval_1" sourceRef="approval_send" targetRef="approval_validate" name="POST workflows" />
+    <bpmn:sequenceFlow id="Flow_approval_2" sourceRef="approval_validate" targetRef="approval_valid" />
+    <bpmn:sequenceFlow id="Flow_approval_3" sourceRef="approval_valid" targetRef="approval_pin" name="Да" />
+    <bpmn:sequenceFlow id="Flow_approval_4" sourceRef="approval_valid" targetRef="approval_error" name="Нет" />
+    <bpmn:sequenceFlow id="Flow_approval_5" sourceRef="approval_pin" targetRef="approval_decision" />
+    <bpmn:sequenceFlow id="Flow_approval_6" sourceRef="approval_decision" targetRef="approval_choice" name="POST decisions" />
+    <bpmn:sequenceFlow id="Flow_approval_7" sourceRef="approval_choice" targetRef="approval_all" name="approve" />
+    <bpmn:sequenceFlow id="Flow_approval_8" sourceRef="approval_choice" targetRef="approval_terminal" name="reject / revision" />
+    <bpmn:sequenceFlow id="Flow_approval_9" sourceRef="approval_all" targetRef="approval_approved" name="Да" />
+    <bpmn:sequenceFlow id="Flow_approval_10" sourceRef="approval_all" targetRef="approval_next" name="Нет" />
+    <bpmn:sequenceFlow id="Flow_approval_11" sourceRef="approval_next" targetRef="approval_decision" name="Текущий PENDING" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_approval">
+    <bpmndi:BPMNPlane id="Plane_approval" bpmnElement="Process_approval">
+      <bpmndi:BPMNShape id="LaneShape_approval_0" bpmnElement="Lane_approval_0" isHorizontal="true">
+        <dc:Bounds x="20" y="20" width="1650" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_approval_1" bpmnElement="Lane_approval_1" isHorizontal="true">
+        <dc:Bounds x="20" y="220" width="1650" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="LaneShape_approval_2" bpmnElement="Lane_approval_2" isHorizontal="true">
+        <dc:Bounds x="20" y="420" width="1650" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_start" bpmnElement="approval_start">
+        <dc:Bounds x="70" y="85" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="35" y="129" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_send" bpmnElement="approval_send">
+        <dc:Bounds x="180" y="75" width="130" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_validate" bpmnElement="approval_validate">
+        <dc:Bounds x="360" y="275" width="130" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_valid" bpmnElement="approval_valid">
+        <dc:Bounds x="550" y="285" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="515" y="343" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_pin" bpmnElement="approval_pin">
+        <dc:Bounds x="680" y="275" width="130" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_decision" bpmnElement="approval_decision">
+        <dc:Bounds x="850" y="475" width="130" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_choice" bpmnElement="approval_choice">
+        <dc:Bounds x="1020" y="485" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="985" y="543" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_all" bpmnElement="approval_all">
+        <dc:Bounds x="1160" y="285" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1125" y="343" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_next" bpmnElement="approval_next">
+        <dc:Bounds x="1350" y="275" width="130" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_approved" bpmnElement="approval_approved">
+        <dc:Bounds x="1500" y="85" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1465" y="129" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_terminal" bpmnElement="approval_terminal">
+        <dc:Bounds x="1210" y="555" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1175" y="599" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_approval_error" bpmnElement="approval_error">
+        <dc:Bounds x="680" y="360" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="645" y="404" width="110" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_approval_0" bpmnElement="Flow_approval_0">
+        <di:waypoint x="106" y="103.0" />
+        <di:waypoint x="143.0" y="103.0" />
+        <di:waypoint x="143.0" y="110.0" />
+        <di:waypoint x="180" y="110.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_1" bpmnElement="Flow_approval_1">
+        <di:waypoint x="310" y="110.0" />
+        <di:waypoint x="335.0" y="110.0" />
+        <di:waypoint x="335.0" y="310.0" />
+        <di:waypoint x="360" y="310.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="290.0" y="275.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_2" bpmnElement="Flow_approval_2">
+        <di:waypoint x="490" y="310.0" />
+        <di:waypoint x="520.0" y="310.0" />
+        <di:waypoint x="520.0" y="310.0" />
+        <di:waypoint x="550" y="310.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_3" bpmnElement="Flow_approval_3">
+        <di:waypoint x="600" y="310.0" />
+        <di:waypoint x="640.0" y="310.0" />
+        <di:waypoint x="640.0" y="310.0" />
+        <di:waypoint x="680" y="310.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="595.0" y="275.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_4" bpmnElement="Flow_approval_4">
+        <di:waypoint x="600" y="310.0" />
+        <di:waypoint x="640.0" y="310.0" />
+        <di:waypoint x="640.0" y="378.0" />
+        <di:waypoint x="680" y="378.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="595.0" y="343.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_5" bpmnElement="Flow_approval_5">
+        <di:waypoint x="810" y="310.0" />
+        <di:waypoint x="830.0" y="310.0" />
+        <di:waypoint x="830.0" y="510.0" />
+        <di:waypoint x="850" y="510.0" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_6" bpmnElement="Flow_approval_6">
+        <di:waypoint x="980" y="510.0" />
+        <di:waypoint x="1000.0" y="510.0" />
+        <di:waypoint x="1000.0" y="510.0" />
+        <di:waypoint x="1020" y="510.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="955.0" y="475.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_7" bpmnElement="Flow_approval_7">
+        <di:waypoint x="1070" y="510.0" />
+        <di:waypoint x="1115.0" y="510.0" />
+        <di:waypoint x="1115.0" y="310.0" />
+        <di:waypoint x="1160" y="310.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1070.0" y="275.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_8" bpmnElement="Flow_approval_8">
+        <di:waypoint x="1070" y="510.0" />
+        <di:waypoint x="1140.0" y="510.0" />
+        <di:waypoint x="1140.0" y="573.0" />
+        <di:waypoint x="1210" y="573.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1095.0" y="538.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_9" bpmnElement="Flow_approval_9">
+        <di:waypoint x="1210" y="310.0" />
+        <di:waypoint x="1355.0" y="310.0" />
+        <di:waypoint x="1355.0" y="103.0" />
+        <di:waypoint x="1500" y="103.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1310.0" y="68.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_10" bpmnElement="Flow_approval_10">
+        <di:waypoint x="1210" y="310.0" />
+        <di:waypoint x="1280.0" y="310.0" />
+        <di:waypoint x="1280.0" y="310.0" />
+        <di:waypoint x="1350" y="310.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1235.0" y="275.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_approval_11" bpmnElement="Flow_approval_11">
+        <di:waypoint x="1480" y="310.0" />
+        <di:waypoint x="1165.0" y="310.0" />
+        <di:waypoint x="1165.0" y="510.0" />
+        <di:waypoint x="850" y="510.0" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1120.0" y="475.0" width="90" height="32" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,299 @@
+erDiagram
+  access_grants {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ document_id FK
+    VARCHAR_36_ version_id FK
+    VARCHAR_36_ recipient_id FK
+    VARCHAR_36_ requested_by FK
+    VARCHAR_20_ recipient_role 
+    VARCHAR_36_ recipient_department_id 
+    VARCHAR_36_ department_id 
+    VARCHAR_20_ classification 
+    VARCHAR_20_ purpose 
+    VARCHAR_36_ instance_id FK
+    VARCHAR_36_ approval_id FK
+    BOOLEAN can_card 
+    BOOLEAN can_file 
+    BOOLEAN can_snapshot 
+    BOOLEAN can_comments 
+    BOOLEAN can_history 
+    BOOLEAN can_compare 
+    VARCHAR_1000_ reason 
+    INTEGER duration_hours 
+    VARCHAR_64_ scope_hash 
+    VARCHAR_20_ status 
+    DATETIME requested_at 
+    DATETIME review_deadline 
+    DATETIME activated_at 
+    DATETIME expires_at 
+    DATETIME revoked_at 
+    JSON snapshot 
+  }
+  acl_authorities {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ user_id FK
+    VARCHAR_36_ department_id FK
+    VARCHAR_20_ office 
+    BOOLEAN active 
+    DATETIME expires_at 
+  }
+  acl_department_policies {
+    VARCHAR_36_ department_id PK,FK
+    BOOLEAN enabled 
+    VARCHAR_36_ updated_by FK
+    DATETIME updated_at 
+  }
+  approvals {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ instance_id FK
+    INTEGER stage 
+    VARCHAR_36_ user_id FK
+    VARCHAR_30_ status 
+    DATETIME due_at 
+    DATETIME acted_at 
+  }
+  audit_events {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ actor_id FK
+    VARCHAR_60_ action 
+    VARCHAR_30_ target_type 
+    VARCHAR_36_ target_id 
+    JSON safe_metadata 
+    VARCHAR_36_ request_id 
+    DATETIME created_at 
+  }
+  auth_sessions {
+    VARCHAR_36_ public_id 
+    VARCHAR_200_ user_agent 
+    VARCHAR_64_ id PK
+    VARCHAR_36_ user_id FK
+    VARCHAR_64_ csrf_token 
+    DATETIME expires_at 
+    DATETIME created_at 
+  }
+  comments {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ document_id FK
+    VARCHAR_36_ author_id FK
+    VARCHAR_4000_ body 
+    VARCHAR_36_ version_id FK
+    VARCHAR_36_ instance_id FK
+    INTEGER stage 
+    DATETIME created_at 
+  }
+  departments {
+    VARCHAR_36_ id PK
+    VARCHAR_40_ code UK
+    VARCHAR_100_ name_ru 
+    VARCHAR_100_ name_en 
+    DATETIME created_at 
+    DATETIME updated_at 
+  }
+  document_favorites {
+    VARCHAR_36_ user_id PK,FK
+    VARCHAR_36_ document_id PK,FK
+    DATETIME created_at 
+  }
+  document_types {
+    VARCHAR_36_ id PK
+    VARCHAR_40_ code UK
+    VARCHAR_100_ name_ru 
+    VARCHAR_100_ name_en 
+    JSON metadata_schema 
+    DATETIME created_at 
+    DATETIME updated_at 
+  }
+  document_versions {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ document_id FK
+    INTEGER version_number 
+    VARCHAR_200_ original_filename 
+    VARCHAR_64_ storage_key UK
+    VARCHAR_100_ mime_type 
+    BIGINT size 
+    VARCHAR_64_ sha256 
+    VARCHAR_36_ created_by FK
+    VARCHAR_1000_ change_note 
+    JSON metadata_snapshot 
+    DATETIME created_at 
+  }
+  documents {
+    VARCHAR_36_ id PK,FK
+    VARCHAR_40_ number UK
+    VARCHAR_240_ title 
+    VARCHAR_36_ type_id FK
+    VARCHAR_36_ owner_id FK
+    VARCHAR_36_ department_id FK
+    VARCHAR_30_ status 
+    JSON business_metadata 
+    VARCHAR_36_ current_version_id FK
+    VARCHAR_4000_ description 
+    VARCHAR_100_ category 
+    JSON tags 
+    VARCHAR_36_ responsible_id FK
+    VARCHAR_20_ confidentiality 
+    DATE effective_date 
+    DATE expiration_date 
+    VARCHAR_36_ folder_id FK
+    DATETIME deleted_at 
+    INTEGER revision 
+    DATETIME created_at 
+    DATETIME updated_at 
+  }
+  file_scans {
+    VARCHAR_36_ version_id PK,FK
+    VARCHAR_64_ sha256 
+    VARCHAR_40_ engine 
+    DATETIME created_at 
+  }
+  folders {
+    VARCHAR_36_ id PK
+    VARCHAR_120_ name 
+    VARCHAR_36_ owner_id FK
+    VARCHAR_36_ parent_id FK
+    DATETIME created_at 
+    DATETIME updated_at 
+  }
+  grant_endorsements {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ grant_id FK
+    VARCHAR_36_ actor_id FK
+    VARCHAR_36_ authority_id FK
+    VARCHAR_20_ office 
+    VARCHAR_64_ scope_hash 
+    DATETIME approved_at 
+  }
+  login_throttles {
+    VARCHAR_64_ id PK
+    INTEGER failures 
+    DATETIME window_start 
+  }
+  operation_keys {
+    VARCHAR_36_ actor_id PK,FK
+    VARCHAR_36_ key PK
+    VARCHAR_64_ fingerprint 
+    JSON response 
+    DATETIME created_at 
+  }
+  receipt_revocations {
+    VARCHAR_36_ approval_id PK,FK
+    VARCHAR_36_ actor_id FK
+    VARCHAR_1000_ reason 
+    BOOLEAN hide_receipt 
+    DATETIME revoked_at 
+  }
+  review_receipts {
+    VARCHAR_36_ approval_id PK,FK
+    VARCHAR_36_ actor_id FK
+    VARCHAR_36_ version_id FK
+    VARCHAR_30_ outcome 
+    VARCHAR_30_ process_status 
+    VARCHAR_36_ idempotency_key 
+    DATETIME acted_at 
+    JSON snapshot 
+  }
+  users {
+    VARCHAR_36_ id PK
+    VARCHAR_254_ email UK
+    VARCHAR_100_ display_name 
+    VARCHAR_255_ password_hash 
+    VARCHAR_20_ role 
+    VARCHAR_20_ status 
+    VARCHAR_36_ department_id FK
+    DATETIME created_at 
+    DATETIME updated_at 
+  }
+  workflow_events {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ instance_id FK
+    VARCHAR_36_ actor_id FK
+    VARCHAR_30_ action 
+    VARCHAR_2000_ comment 
+    VARCHAR_30_ previous_state 
+    VARCHAR_30_ new_state 
+    VARCHAR_36_ idempotency_key 
+    VARCHAR_64_ request_hash 
+    DATETIME created_at 
+  }
+  workflow_instances {
+    VARCHAR_36_ id PK
+    VARCHAR_36_ document_id FK
+    VARCHAR_36_ document_version_id FK
+    VARCHAR_36_ template_id FK
+    JSON metadata_snapshot 
+    INTEGER stage 
+    VARCHAR_30_ status 
+    VARCHAR_36_ started_by FK
+    DATETIME created_at 
+    DATETIME completed_at 
+  }
+  workflow_requirements {
+    VARCHAR_36_ type_id PK,FK
+    VARCHAR_36_ template_id FK
+    JSON reviewer_roles 
+  }
+  workflow_templates {
+    VARCHAR_36_ id PK
+    VARCHAR_40_ code 
+    INTEGER version 
+    VARCHAR_120_ name_ru 
+    VARCHAR_120_ name_en 
+    JSON definition 
+    VARCHAR_36_ created_by FK
+    DATETIME created_at 
+  }
+  workflow_instances |o--o{ access_grants : "instance_id"
+  users ||--o{ access_grants : "recipient_id"
+  approvals |o--o{ access_grants : "approval_id"
+  users ||--o{ access_grants : "requested_by"
+  document_versions ||--o{ access_grants : "document_id"
+  documents ||--o{ access_grants : "document_id"
+  document_versions ||--o{ access_grants : "document_id,version_id"
+  documents ||--o{ access_grants : "document_id,version_id"
+  departments ||--o{ acl_authorities : "department_id"
+  users ||--o{ acl_authorities : "user_id"
+  users ||--o{ acl_department_policies : "updated_by"
+  departments ||--o| acl_department_policies : "department_id"
+  workflow_instances ||--o{ approvals : "instance_id"
+  users ||--o{ approvals : "user_id"
+  users |o--o{ audit_events : "actor_id"
+  users ||--o{ auth_sessions : "user_id"
+  document_versions |o--o{ comments : "version_id"
+  documents ||--o{ comments : "document_id"
+  workflow_instances |o--o{ comments : "instance_id"
+  users ||--o{ comments : "author_id"
+  documents ||--o{ document_favorites : "document_id"
+  users ||--o{ document_favorites : "user_id"
+  documents ||--o{ document_versions : "document_id"
+  users ||--o{ document_versions : "created_by"
+  users ||--o{ documents : "owner_id"
+  departments |o--o{ documents : "department_id"
+  users |o--o{ documents : "responsible_id"
+  folders |o--o{ documents : "folder_id"
+  document_types ||--o{ documents : "type_id"
+  document_versions |o--o| documents : "id,current_version_id"
+  document_versions ||--o| file_scans : "version_id"
+  folders |o--o{ folders : "parent_id"
+  users ||--o{ folders : "owner_id"
+  acl_authorities ||--o{ grant_endorsements : "authority_id"
+  access_grants ||--o{ grant_endorsements : "grant_id"
+  users ||--o{ grant_endorsements : "actor_id"
+  users ||--o{ operation_keys : "actor_id"
+  approvals ||--o| receipt_revocations : "approval_id"
+  users ||--o{ receipt_revocations : "actor_id"
+  document_versions ||--o{ review_receipts : "version_id"
+  approvals ||--o| review_receipts : "approval_id"
+  users ||--o{ review_receipts : "actor_id"
+  departments |o--o{ users : "department_id"
+  workflow_instances ||--o{ workflow_events : "instance_id"
+  users ||--o{ workflow_events : "actor_id"
+  workflow_templates ||--o{ workflow_instances : "template_id"
+  users ||--o{ workflow_instances : "started_by"
+  document_versions ||--o{ workflow_instances : "document_id"
+  documents ||--o{ workflow_instances : "document_id"
+  document_versions ||--o{ workflow_instances : "document_id,document_version_id"
+  documents ||--o{ workflow_instances : "document_id,document_version_id"
+  workflow_templates ||--o{ workflow_requirements : "template_id"
+  document_types ||--o| workflow_requirements : "type_id"
+  users ||--o{ workflow_templates : "created_by"
+%% FK cardinality derived from nullability and PK/UNIQUE. Composite FK remains one relationship.

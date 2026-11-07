@@ -1,0 +1,48 @@
+@startuml
+skinparam componentStyle uml2
+actor User
+actor Operator
+component "Next.js UI + API rewrite" as Web
+package "FastAPI modular monolith" {
+ component "main / body_limit" as HTTP
+ component "auth" as Auth
+ component "policy / access" as ACL
+ component "documents / custom_fields" as Docs
+ component "dms / catalog" as DMS
+ component "workflows" as Workflow
+ component "idempotency / audit" as Control
+ component "storage / scanning" as Storage
+}
+database "PostgreSQL / SQLAlchemy" as PG
+folder "Private immutable blobs" as Files
+component "ClamAV TCP service" as Clam
+component "ops CLI" as Ops
+User --> Web
+Web --> HTTP : REST v1
+HTTP --> Auth : cookie / ACTIVE / CSRF
+HTTP --> Docs
+HTTP --> DMS
+HTTP --> Workflow
+HTTP --> ACL
+Docs --> ACL
+DMS --> ACL
+Workflow --> ACL
+Docs --> Control
+DMS --> Control
+Workflow --> Control
+Docs --> Storage
+Auth --> PG
+ACL --> PG
+Control --> PG
+Docs --> PG
+Workflow --> PG
+Storage --> Files
+Storage --> Clam : INSTREAM
+Operator --> Ops
+Ops --> PG
+Ops --> Files
+note bottom of Workflow
+ In-process workflow implementation;
+ BPMN diagrams are non-executable documentation.
+end note
+@enduml
