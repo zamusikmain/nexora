@@ -99,7 +99,8 @@ def provision(conn, passwords):
         "SELECT p.oid::regprocedure::text,p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace "
         "WHERE n.nspname='public'"
     ).fetchall()
-    if {row[1] for row in functions} - {"nexora_immutable_row", "nexora_workflow_snapshot", "nexora_acl_grant_snapshot"}:
+    if {row[1] for row in functions} - {"nexora_immutable_row", "nexora_workflow_snapshot", "nexora_acl_grant_snapshot",
+                                         "nexora_operation_key_purge_guard"}:
         raise ValueError("Unexpected public-schema functions")
     # Function signatures come from the server catalog, never user input.
     for signature, _ in functions:

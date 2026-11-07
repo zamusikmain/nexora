@@ -395,6 +395,8 @@ class OperationKey(Base):
     fingerprint: Mapped[str] = mapped_column(String(64))
     response: Mapped[dict[str, Any]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Signed key expiry; NULL for legacy client UUID keys, which are never purged automatically.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class WorkflowRequirement(Base):

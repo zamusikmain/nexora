@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -5,6 +6,8 @@ from urllib.parse import urlsplit
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEV_OPERATION_KEY_SECRET = "development-only-operation-key-secret-do-not-use"
 
 
 class Settings(BaseSettings):
@@ -17,6 +20,12 @@ class Settings(BaseSettings):
     session_hours: int = 12
     # Comma-separated CIDRs/addresses/hostnames whose X-Forwarded-For is honoured for throttling.
     trusted_proxies: str = ""
+    # Signed retry keys (app.operation_keys). Keep the secret and epoch outside database dumps.
+    operation_key_secret: str = DEV_OPERATION_KEY_SECRET
+    operation_key_ttl_days: int = Field(default=30, ge=1, le=365)
+    operation_key_epoch: int = Field(default=1, ge=1)
+    # Client UUID keys are refused from this instant; unset accepts them (development only).
+    legacy_operation_keys_until: datetime | None = None
     seed_demo: bool = False
     demo_password: str = ""
     malware_scanner: Literal["disabled-development", "clamav"] = "disabled-development"
@@ -42,7 +51,13 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires an HTTPS origin")
             if "local-development-only" in self.database_url:
                 raise ValueError("Production requires a non-demo database credential")
+            if self.operation_key_secret == DEV_OPERATION_KEY_SECRET or len(self.operation_key_secret) < 32:
+                raise ValueError("Production requires OPERATION_KEY_SECRET of at least 32 characters")
+            if self.legacy_operation_keys_until is None:
+                raise ValueError("Production requires LEGACY_OPERATION_KEYS_UNTIL (end of legacy key retries)")
         self.web_origin = self.web_origin.rstrip("/")
+        if self.legacy_operation_keys_until and self.legacy_operation_keys_until.tzinfo is None:
+            self.legacy_operation_keys_until = self.legacy_operation_keys_until.replace(tzinfo=UTC)
         return self
 
 
