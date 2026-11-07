@@ -80,7 +80,58 @@ def test_required_route_rejects_unauthorized_roles_and_conditional_stages(databa
         assert result.status_code == (409 if conditional else 422), result.text
     finally:
         with database.begin() as db:
-            db.delete(db.get(WorkflowRequirement, "type"))
+            db.query(WorkflowRequirement).filter_by(type_id="type").delete()
+
+
+def test_required_route_is_selected_by_type_and_classification(database):
+    from app.models import WorkflowInstance
+
+    owner, admin = client(), client("admin")
+
+    def template(role):
+        response = admin.post(
+            "/api/v1/workflow-templates",
+            json={"code": "C_" + uuid4().hex[:8].upper(), "name_ru": "Тест", "name_en": "Test",
+                  "stages": [{"name_ru": "Этап", "name_en": "Stage", "selector": "role", "targets": [role]}]},
+        )
+        assert response.status_code == 201, response.text
+        return response.json()["id"]
+
+    def document(classification):
+        doc = create(owner)
+        base = "/api/v1/documents/" + doc["id"]
+        assert owner.patch(base, json={"confidentiality": classification}).status_code == 200
+        uploaded(owner, base)
+        return base
+
+    def start(base, template_id):
+        return owner.post(base + "/workflows", json={
+            "template_id": template_id, "expected_revision": owner.get(base).json()["revision"],
+            "idempotency_key": str(uuid4()),
+        })
+
+    general, strict = template("MANAGER"), template("LEGAL")
+    with database.begin() as db:
+        db.add(WorkflowRequirement(type_id="type", classification="*", template_id=general, reviewer_roles=["MANAGER"]))
+        db.add(WorkflowRequirement(type_id="type", classification="CONFIDENTIAL", template_id=strict,
+                                   reviewer_roles=["LEGAL"]))
+    try:
+        confidential, internal, restricted = document("CONFIDENTIAL"), document("INTERNAL"), document("RESTRICTED")
+        # The exact classification route cannot be swapped for the type-wide one.
+        assert start(confidential, general).json()["error"] == "required_workflow"
+        started = start(confidential, strict)
+        assert started.status_code == 201, started.text
+        # Classifications without their own route fall back to the '*' route.
+        assert start(internal, strict).json()["error"] == "required_workflow"
+        assert start(internal, general).status_code == 201
+        assert start(restricted, strict).json()["error"] == "required_workflow"
+        with database() as db:
+            snapshot = db.get(WorkflowInstance, started.json()["id"]).metadata_snapshot
+            assert snapshot["required_route"] == {"template_id": strict, "classification": "CONFIDENTIAL"}
+            assert snapshot["reviewer_roles"] == ["LEGAL"]
+    finally:
+        with database.begin() as db:
+            db.query(WorkflowRequirement).filter_by(type_id="type").delete()
 
 
 @pytest.mark.parametrize("committed", [False, True])

@@ -398,7 +398,16 @@ class OperationKey(Base):
 
 
 class WorkflowRequirement(Base):
+    """Required route per document type; classification '*' applies to any classification."""
+
     __tablename__ = "workflow_requirements"
+    __table_args__ = (
+        CheckConstraint(
+            "classification IN ('*','PUBLIC','INTERNAL','CONFIDENTIAL','RESTRICTED')",
+            name="ck_workflow_requirement_classification",
+        ),
+    )
     type_id: Mapped[str] = mapped_column(ForeignKey("document_types.id"), primary_key=True)
+    classification: Mapped[str] = mapped_column(String(20), primary_key=True, default="*", server_default="*")
     template_id: Mapped[str] = mapped_column(ForeignKey("workflow_templates.id"))
     reviewer_roles: Mapped[list[str]] = mapped_column(JSON)
