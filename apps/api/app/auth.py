@@ -74,11 +74,17 @@ def login(body: Login, request: Request, response: Response, db: Db) -> dict:
         keys.append(digest("peer:" + client))
     buckets = []
     for key in sorted(keys):
-        db.execute(
-            insert(LoginThrottle).values(id=key, failures=0, window_start=now).on_conflict_do_nothing()
-        )
-        bucket = db.scalar(select(LoginThrottle).where(LoginThrottle.id == key).with_for_update())
-        assert bucket is not None
+        bucket = None
+        # The operator purge (app.auth_cleanup) may delete a stale row between insert and lock.
+        for _ in range(3):
+            db.execute(
+                insert(LoginThrottle).values(id=key, failures=0, window_start=now).on_conflict_do_nothing()
+            )
+            bucket = db.scalar(select(LoginThrottle).where(LoginThrottle.id == key).with_for_update())
+            if bucket is not None:
+                break
+        if bucket is None:
+            raise HTTPException(503, "login_temporarily_unavailable")
         if bucket.window_start + timedelta(minutes=15) <= now:
             bucket.window_start, bucket.failures = now, 0
         buckets.append(bucket)
