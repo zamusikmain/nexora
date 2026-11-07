@@ -15,9 +15,23 @@ async function operationKey(path: string, method: string, body: BodyInit | null 
   const storageKey = `nexora-operation:${fingerprint}`;
   let key = pending.get(storageKey);
   try { key ||= sessionStorage.getItem(storageKey) || undefined; } catch { /* Storage may be disabled. */ }
-  key ||= crypto.randomUUID(); pending.set(storageKey, key);
+  // The server signs and dates the key; it is stored BEFORE the action is sent, so a lost
+  // response is retried with the same key. An expired key gets 409 operation_expired.
+  key ||= await issueOperationKey(); pending.set(storageKey, key);
   try { sessionStorage.setItem(storageKey, key); } catch { /* Memory preserves same-tab retries. */ }
   return { key, storageKey };
+}
+
+async function issueOperationKey(): Promise<string> {
+  const response = await fetch("/api/v1/operation-keys", {
+    method: "POST", headers: { "X-CSRF-Token": csrf }, credentials: "same-origin", cache: "no-store",
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || typeof data.key !== "string") {
+    if (response.status === 401 && typeof window !== "undefined") window.dispatchEvent(new Event("nexora-unauthorized"));
+    throw new ApiError(typeof data.error === "string" ? data.error : "server_error", response.status);
+  }
+  return data.key;
 }
 export function setCsrf(value: string, actorId = "") {
   csrf = value;

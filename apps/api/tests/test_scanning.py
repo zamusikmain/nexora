@@ -62,9 +62,14 @@ def test_production_cannot_disable_scanning_or_create_demo(monkeypatch, tmp_path
         database_url="postgresql+psycopg://service:private@db/test",
         malware_scanner="clamav",
         web_origin="https://example.test",
+        operation_key_secret="x" * 40,
+        legacy_operation_keys_until="2026-12-01T00:00:00Z",
     )
     assert Settings(**baseline).web_origin == "https://example.test"
     for values in [
+        {"operation_key_secret": "development-only-operation-key-secret-do-not-use"},
+        {"operation_key_secret": "too-short"},
+        {"legacy_operation_keys_until": None},
         {"malware_scanner": "disabled-development"},
         {"seed_demo": True},
         {"demo_password": "synthetic-demo"},

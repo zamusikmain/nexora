@@ -11,6 +11,10 @@ services:
       APP_ENV: production
       SEED_DEMO: "false"
       DEMO_PASSWORD: ""
+      # Signed retry keys: secret and epoch live outside database dumps (raise the epoch after restoring an old backup).
+      OPERATION_KEY_SECRET: ${OPERATION_KEY_SECRET:?Set a random secret of at least 32 characters}
+      OPERATION_KEY_EPOCH: ${OPERATION_KEY_EPOCH:-1}
+      LEGACY_OPERATION_KEYS_UNTIL: ${LEGACY_OPERATION_KEYS_UNTIL:?Set the end of legacy UUID key retries, e.g. 2026-12-01T00:00:00Z}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -25,6 +29,9 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:?Set public HTTPS origin}
       MALWARE_SCANNER: clamav
       SEED_DEMO: "false"
+      # Production settings validation also runs for the migrator.
+      OPERATION_KEY_SECRET: ${OPERATION_KEY_SECRET:?Set a random secret of at least 32 characters}
+      LEGACY_OPERATION_KEYS_UNTIL: ${LEGACY_OPERATION_KEYS_UNTIL:?Set the end of legacy UUID key retries}
     depends_on:
       db:
         condition: service_healthy
