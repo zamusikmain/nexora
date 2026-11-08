@@ -22,3 +22,16 @@ API image has runtime/development/production targets. Only the development targe
 These deployment controls do not complete pilot readiness: MFA/SSO, granular ACL, organization boundaries, verified reverse-proxy forwarding for rate limiting, least-privilege DB roles, TLS/secrets management, background jobs, observability/alerting and scale verification remain required for the intended enterprise scope.
 
 Least-privilege PostgreSQL cutover is prepared and isolated-tested, but NOT applied to the existing stack. See `database-roles.md` for the explicit opt-in `compose.roles.yaml`, secrets, provisioning, rollback and verification. Existing startup commands above still use the administrator connection until approved cutover. Never enable the roles overlay before provisioning. Append it after the security/production overlays; it removes Alembic from API startup and uses a migrations-only service.
+
+## Scheduled operator commands
+
+Run these from the operator's scheduler inside the API container (`docker compose exec api python -m ...`). Each is a dry run without `--apply`:
+
+| Command | Suggested cadence | Effect |
+|---|---|---|
+| `app.workflow_escalation --apply` | every 15 min | one-time overdue escalation notices, audited `WORKFLOW_ESCALATED` |
+| `app.notification_dispatch --apply` | every 1–5 min, only with `SMTP_HOST` | email outbox delivery, audited `NOTIFICATION_EMAILS_SENT` |
+| `app.auth_cleanup --apply` | daily | expired sessions and stale login throttles |
+| `app.operation_key_cleanup --apply` | daily | expired signed retry keys |
+
+Migration `0011_notifications` adds a table and a column only. Re-run role provisioning afterwards so the runtime gets its column-limited `notifications` grants. See [notifications](notifications.md).
