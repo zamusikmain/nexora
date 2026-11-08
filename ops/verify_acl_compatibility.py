@@ -47,8 +47,11 @@ def verify(config, settings):
         with psycopg.connect(copy_admin) as conn:
             result = {}
             for table in tables:
+                # Columns added by later migrations are absent before the upgrade; they are
+                # checked separately so historical values themselves must match exactly.
                 excluded = ['metadata_snapshot'] if table == 'document_versions' else (
-                    ['version_id', 'instance_id', 'stage'] if table == 'comments' else [])
+                    ['version_id', 'instance_id', 'stage'] if table == 'comments' else (
+                        ['escalated_at'] if table == 'approvals' else []))
                 result[table] = conn.execute(sql.SQL(
                     "SELECT to_jsonb(t) - %s::text[] FROM {} t ORDER BY id"
                 ).format(sql.Identifier(table)), (excluded,)).fetchall()
@@ -58,6 +61,9 @@ def verify(config, settings):
     settings.database_url = migration_url.rsplit('/', 1)[0] + '/nexora_test_acl_copy'
     command.upgrade(config, 'head')
     assert fingerprint() == before, 'Historical rows changed during upgrade'
+    with psycopg.connect(copy_admin) as conn:
+        assert conn.execute("SELECT count(*) FROM approvals WHERE escalated_at IS NOT NULL").fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM notifications").fetchone()[0] == 0
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
 

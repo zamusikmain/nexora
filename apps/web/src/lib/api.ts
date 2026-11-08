@@ -52,7 +52,8 @@ export async function api<T>(
 ): Promise<T> {
   const method = options.method || "GET";
   const headers = new Headers(options.headers);
-  const operation = !path.startsWith("/auth/") && !["GET", "HEAD"].includes(method) && !headers.has("Idempotency-Key")
+  // Read-state changes are naturally idempotent and need no signed retry key.
+  const operation = !path.startsWith("/auth/") && !path.startsWith("/notifications/") &&!["GET", "HEAD"].includes(method) && !headers.has("Idempotency-Key")
     ? await operationKey(path, method, options.body) : null;
   if (operation) headers.set("Idempotency-Key", operation.key);
   const workflow = /^\/(documents\/[^/]+\/workflows|workflows\/[^/]+\/decisions)$/.test(path);
