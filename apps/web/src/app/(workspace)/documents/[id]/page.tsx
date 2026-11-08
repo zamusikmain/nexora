@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import { Activity, Catalog, Comment, Document, Version } from "@/lib/types";
+import { Activity, Catalog, Comment, Document, Signature, Version } from "@/lib/types";
+import { VersionSignatures } from "@/components/signatures";
 import { useI18n } from "@/components/provider";
 import { CustomFields, collectCustomFields } from "@/components/custom-fields";
 import { Workflow } from "@/components/workflow";
@@ -27,6 +28,7 @@ export default function Page() {
   const [versions, setVersions] = useState<Version[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [signatures, setSignatures] = useState<Signature[]>([]);
   const [types, setTypes] = useState<Catalog[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,14 +38,15 @@ export default function Page() {
     const current = ++generation.current.value;
     try {
       const d = await api<Document>(`/documents/${id}`);
-      const [v, c, a, types] = await Promise.all([
+      const [v, c, a, types, s] = await Promise.all([
         d.capabilities.versions ? api<Version[]>(`/documents/${id}/versions`) : Promise.resolve([]),
         d.capabilities.comments ? api<Comment[]>(`/documents/${id}/comments`) : Promise.resolve([]),
         d.capabilities.activity ? api<Activity[]>(`/documents/${id}/activity`) : Promise.resolve([]),
         api<Catalog[]>("/document-types"),
+        d.capabilities.versions ? api<Signature[]>(`/documents/${id}/signatures`) : Promise.resolve([]),
       ]);
       if (current !== generation.current.value) return;
-      setDoc(d); setVersions(v); setComments(c); setActivity(a); setTypes(types); setError("");
+      setDoc(d); setVersions(v); setComments(c); setActivity(a); setTypes(types); setSignatures(s); setError("");
     } catch (e) {
       if (current !== generation.current.value) return;
       setDoc(null); setVersions([]); setComments([]); setActivity([]); setEditing(false);
@@ -317,6 +320,13 @@ export default function Page() {
                       <summary>{t("hash")}</summary>
                       <code>{v.sha256}</code>
                     </details>
+                    <VersionSignatures
+                      documentId={id}
+                      versionId={v.id}
+                      signatures={signatures.filter((s) => s.version_id === v.id)}
+                      canSign={!doc.deleted_at}
+                      onSigned={load}
+                    />
                   </div>
                   <a
                     className="button"

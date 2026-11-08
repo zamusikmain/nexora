@@ -75,6 +75,8 @@ def test_role_attributes_and_ownership(role_connections):
     "UPDATE notifications SET recipient_id='forged' WHERE false",
     "UPDATE notifications SET kind='TASK_ASSIGNED' WHERE false",
     "DELETE FROM notifications WHERE false",
+    "UPDATE document_signatures SET status='VALID' WHERE false",
+    "DELETE FROM document_signatures WHERE false",
 ])
 def test_runtime_forbidden_statements(role_connections, statement):
     conn = role_connections[0]
