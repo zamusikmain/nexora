@@ -1,5 +1,7 @@
 # NEXORA enterprise increment — verification
 
+2026-11-08: [Notifications and escalation](notifications.md) — migration 0011_notifications; CI rehearsal 496 passed / 46 skipped (8 new notification, escalation and outbox tests), web 9 unit tests, Playwright notification scenario. SMTP delivery is tested with a fake transport only; no real mail server was used.
+
 2026-10-09: [Security & Reliability Hardening](workflow-hardening.md) records the isolated candidate checks, new migration 0008_hardening, PATCH/idempotency contracts, restore comparison and rollout limits. It does not change the deployed 0006 environment.
 
 2026-10-08 candidate update: [ACL Revision 2 verification](acl-implementation.md) supersedes the ACL/read-policy and test-count statements below for the prepared working-tree code: 507 PASS, 0 XFAIL, isolated migration/copy/restore tests and RU/EN browser checks. Production remains on the previously deployed code/schema; the commercial readiness limitations remain.

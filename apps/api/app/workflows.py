@@ -31,6 +31,7 @@ from app.models import (
     WorkflowRequirement,
     WorkflowTemplate,
 )
+from app.notifications import notify
 from app.policy import can_read, require
 from app.schemas import Input
 
@@ -309,6 +310,31 @@ def commit_event(
         raise HTTPException(409, "idempotency_conflict") from None
 
 
+OWNER_OUTCOMES = {
+    "APPROVED": "WORKFLOW_APPROVED", "REJECTED": "WORKFLOW_REJECTED", "REVISION_REQUIRED": "WORKFLOW_RETURNED",
+}
+
+
+def notify_transition(db: Db, user: Actor, instance: WorkflowInstance, doc: Document,
+                      was_pending: set[str], approvals: list[Approval]) -> None:
+    """Notify new assignees, assignees whose open task was withdrawn, and the owner of the outcome."""
+    for approval in approvals:
+        kind = None
+        if approval.status == "PENDING" and approval.id not in was_pending:
+            kind = "TASK_ASSIGNED"
+        elif approval.status == "CANCELLED" and approval.id in was_pending:
+            kind = "TASK_CANCELLED"
+        if kind:
+            notify(db, [approval.user_id], kind, f"{kind}:{approval.id}", document_id=doc.id,
+                   instance_id=instance.id, approval_id=approval.id, actor_id=user.id,
+                   data={"stage": approval.stage,
+                         "due_at": approval.due_at.isoformat() if approval.due_at else None})
+    outcome = OWNER_OUTCOMES.get(instance.status)
+    if outcome:
+        notify(db, [doc.owner_id], outcome, f"{outcome}:{instance.id}", document_id=doc.id,
+               instance_id=instance.id, actor_id=user.id)
+
+
 @router.get("/documents/{doc_id}/workflows")
 def document_workflows(doc_id: str, db: Db, user: Actor) -> list[dict]:
     doc = get_document(db, user, doc_id)
@@ -418,6 +444,9 @@ def start(doc_id: str, body: Start, request: Request, db: Db, user: Actor) -> di
             )
     doc.status = "IN_APPROVAL"
     doc.revision += 1
+    db.flush()
+    notify_transition(db, user, instance, doc, set(), list(db.scalars(
+        select(Approval).where(Approval.instance_id == instance.id, Approval.status == "PENDING"))))
     commit_event(db, request, user, instance, "STARTED", "", key, fingerprint, "NONE")
     return instance_data(instance, db, user)
 
@@ -491,6 +520,7 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
     if (body.action != "approve" or stage.require_comment) and not body.comment:
         raise HTTPException(422, "approval_comment_required")
     old = instance.status
+    was_pending = {a.id for a in approvals if a.status == "PENDING"}
     if body.action == "approve":
         assert mine is not None
         mine.status = "APPROVED"
@@ -536,6 +566,7 @@ def decide(instance_id: str, body: Decision, request: Request, db: Db, user: Act
                                         "title": instance.metadata_snapshot["title"], "own_comment": body.comment})
         db.add(saved)
     doc.revision += 1
+    notify_transition(db, user, instance, doc, was_pending, approvals)
     commit_event(
         db,
         request,

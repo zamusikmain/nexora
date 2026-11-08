@@ -72,6 +72,9 @@ def test_role_attributes_and_ownership(role_connections):
     "UPDATE workflow_requirements SET reviewer_roles='[]' WHERE false",
     "DELETE FROM workflow_requirements WHERE false",
     "INSERT INTO workflow_requirements(type_id,template_id,reviewer_roles) VALUES ('forged','forged','[]')",
+    "UPDATE notifications SET recipient_id='forged' WHERE false",
+    "UPDATE notifications SET kind='TASK_ASSIGNED' WHERE false",
+    "DELETE FROM notifications WHERE false",
 ])
 def test_runtime_forbidden_statements(role_connections, statement):
     conn = role_connections[0]
