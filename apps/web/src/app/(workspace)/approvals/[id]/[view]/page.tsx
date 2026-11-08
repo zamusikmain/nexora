@@ -70,7 +70,7 @@ export default function Page() {
       </form><button onClick={load}>{t("refreshAccess")}</button><Link href="/access">{t("accessRequests")}</Link>
     </section>}
     {data?.kind === "active_task" && data.document && data.version && <section className="panel">
-      <h1>{data.document.title}</h1><p>{data.stage?.[lang === "ru" ? "name_ru" : "name_en"]}</p>
+      <h1>{data.document.title}</h1><p>{data.stage?.[lang !== "en" ? "name_ru" : "name_en"]}</p>
       <p>{t("workflowVersion")}: {data.version.version_number}</p><p>{data.version.original_filename}</p>
       <pre>{JSON.stringify(data.document.business_metadata, null, 2)}</pre>
       <a className="button" href={`/api/v1/documents/${data.document.id}/versions/${data.version.id}/download`}>{t("download")}</a>

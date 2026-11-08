@@ -7,7 +7,8 @@ export function contentSecurityPolicy(nonce: string, development: boolean) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
     "font-src 'self'",
-    "connect-src 'self'",
+    // NCALayer (ЭЦП) listens only on the signer's own machine; nothing else leaves the origin.
+    "connect-src 'self' wss://127.0.0.1:13579",
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",

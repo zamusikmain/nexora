@@ -25,6 +25,37 @@ test("owner creates a document, uploads a version and another department cannot 
   expect(download.status()).toBe(200);
   expect(await download.text()).toBe(content);
 
+  // ЭЦП: the local NCALayer socket is fully mocked, so a real NCALayer on the machine is never contacted.
+  const signaturesUrl = `/api/v1/documents/${documentUrl.split("/").pop()}/signatures`;
+  let layerRunning = false;
+  const requests: { module: string; args: { data: string; format: string } }[] = [];
+  await page.routeWebSocket("wss://127.0.0.1:13579", (ws) => {
+    if (!layerRunning) {
+      ws.close();
+      return;
+    }
+    ws.send(JSON.stringify({ result: { version: "1.4" } }));
+    ws.onMessage((message) => {
+      requests.push(JSON.parse(String(message)));
+      ws.send(JSON.stringify({ status: true, body: { result: [Buffer.from("e2e-cms-signature").toString("base64")] } }));
+    });
+  });
+  await version.getByRole("button", { name: "Sign with EDS" }).click();
+  await expect(errorBox(page)).toHaveText("NCALayer is not running. Start NCALayer and try again.");
+  expect(await (await page.request.get(signaturesUrl)).json()).toEqual([]);
+
+  layerRunning = true;
+  await version.getByRole("button", { name: "Sign with EDS" }).click();
+  // Development has no verifier: the signature is stored and honestly labelled as not verified.
+  await expect(version.locator(".signature.unverified")).toContainText("Signature stored, not verified by the server:");
+  expect(requests).toHaveLength(1);
+  expect(requests[0].module).toBe("kz.gov.pki.knca.basics");
+  expect(requests[0].args.format).toBe("cms");
+  expect(Buffer.from(requests[0].args.data, "base64").toString()).toBe(content); // the exact stored bytes
+  await expect(version.getByRole("button", { name: "Sign with EDS" })).toHaveCount(0); // one signature per user
+  const cms = await page.request.get(`${signaturesUrl}/${(await (await page.request.get(signaturesUrl)).json())[0].id}/cms`);
+  expect(await cms.text()).toBe("e2e-cms-signature");
+
   await page.goto("/documents");
   await expect(page.getByRole("link", { name: title })).toBeVisible();
 

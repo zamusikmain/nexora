@@ -80,7 +80,7 @@ export function Workflow({
               >
                 {templates.map((x) => (
                   <option key={x.id} value={x.id}>
-                    {lang === "ru" ? x.name_ru : x.name_en} · v{x.version}
+                    {lang !== "en" ? x.name_ru : x.name_en} · v{x.version}
                   </option>
                 ))}
               </select>
@@ -97,7 +97,7 @@ export function Workflow({
         <>
           <p>
             {t(current.status)} · {t("stage")} {current.stage + 1} ·{" "}
-            {lang === "ru"
+            {lang !== "en"
               ? current.template.stages[current.stage].name_ru
               : current.template.stages[current.stage].name_en}
           </p>
@@ -155,7 +155,7 @@ export function Workflow({
       {instances.map((instance) => (
         <details key={instance.id} open={instance.status === "RUNNING"}>
           <summary>
-            {lang === "ru"
+            {lang !== "en"
               ? instance.template.name_ru
               : instance.template.name_en}{" "}
             · v{instance.template.version} · {t(instance.status)}
@@ -176,7 +176,7 @@ export function Workflow({
               <tbody>
                 {instance.approvals.map((a) => (
                   <tr key={a.id}>
-                    <td>{lang === "ru" ? a.name_ru : a.name_en}</td>
+                    <td>{lang !== "en" ? a.name_ru : a.name_en}</td>
                     <td>{a.display_name}</td>
                     <td>{t(a.status)}</td>
                     <td>

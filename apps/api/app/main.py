@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app import access, auth, catalog, documents, notifications, operation_keys
+from app import access, auth, catalog, documents, notifications, operation_keys, signatures
 from app.body_limit import BodyLimit
 from app.config import settings
 from app.db import SessionLocal
@@ -91,7 +91,7 @@ def ready() -> dict:
 
 
 for router in (auth.router, documents.router, catalog.router, access.router, operation_keys.router,
-               notifications.router):
+               notifications.router, signatures.router):
     app.include_router(router, prefix="/api/v1")
 
 

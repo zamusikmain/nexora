@@ -38,6 +38,8 @@ GRANTS = {
     "login_throttles": "SELECT, INSERT, UPDATE, DELETE",
     # Content columns are immutable for the runtime; only read and email-delivery state change.
     "notifications": "SELECT, INSERT",
+    # Signatures are evidence: insert-only, and a trigger also refuses UPDATE/DELETE for every role.
+    "document_signatures": "SELECT, INSERT",
 }
 NOTIFICATION_STATE_COLUMNS = "read_at, email_status, email_attempts, email_sent_at"
 

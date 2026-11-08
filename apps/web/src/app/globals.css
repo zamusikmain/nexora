@@ -684,3 +684,25 @@ label.check {
     flex-direction: column;
   }
 }
+
+/* ЭЦП signatures */
+.signatures {
+  margin-top: 8px;
+}
+.signature {
+  margin: 4px 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.signature.valid {
+  background: #eaf7ef;
+  border-left: 3px solid #2f9e5b;
+}
+.signature.unverified {
+  background: #fff6e5;
+  border-left: 3px solid #d08a00;
+}
+.signature a {
+  text-decoration: underline;
+}

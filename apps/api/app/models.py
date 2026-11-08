@@ -439,6 +439,34 @@ class Notification(Base):
     email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class DocumentSignature(Base):
+    """Detached CMS (ЭЦП) over the exact stored bytes of one version. Immutable once written."""
+
+    __tablename__ = "document_signatures"
+    __table_args__ = (
+        UniqueConstraint("version_id", "signer_id", name="uq_signature_version_signer"),
+        ForeignKeyConstraint(["document_id", "version_id"],
+                             ["document_versions.document_id", "document_versions.id"], name="fk_signature_version"),
+        CheckConstraint("status IN ('VALID','UNVERIFIED')", name="signature_status"),
+        Index("ix_signatures_document", "document_id", "created_at"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"))
+    version_id: Mapped[str] = mapped_column(String(36))
+    signer_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    cms: Mapped[str] = mapped_column(String(400_000))
+    cms_sha256: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(12))
+    verifier: Mapped[str] = mapped_column(String(20))
+    subject_name: Mapped[str | None] = mapped_column(String(300))
+    subject_iin: Mapped[str | None] = mapped_column(String(12))
+    subject_bin: Mapped[str | None] = mapped_column(String(12))
+    certificate_serial: Mapped[str | None] = mapped_column(String(80))
+    certificate_not_before: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    certificate_not_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class WorkflowRequirement(Base):
     """Required route per document type; classification '*' applies to any classification."""
 

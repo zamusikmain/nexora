@@ -257,7 +257,7 @@ export default function Page() {
                 <option value="">{t("all")}</option>
                 {items.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {lang === "ru" ? item.name_ru : item.name_en}
+                    {lang !== "en" ? item.name_ru : item.name_en}
                   </option>
                 ))}
               </select>

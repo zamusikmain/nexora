@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_starttls: bool = True
+    # ЭЦП verification. "ncanode" verifies CMS, certificate chain and OCSP through an NCANode
+    # service (Kalkan); "none" stores signatures as UNVERIFIED and is refused in production.
+    signature_verifier: Literal["none", "ncanode"] = "none"
+    ncanode_url: str = ""
+    signature_timeout_seconds: int = Field(default=30, ge=1, le=120)
     seed_demo: bool = False
     demo_password: str = ""
     malware_scanner: Literal["disabled-development", "clamav"] = "disabled-development"
@@ -64,6 +69,8 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires LEGACY_OPERATION_KEYS_UNTIL (end of legacy key retries)")
             if self.smtp_host and not self.smtp_starttls:
                 raise ValueError("Production email requires SMTP_STARTTLS")
+        if self.signature_verifier == "ncanode" and urlsplit(self.ncanode_url).scheme not in {"http", "https"}:
+            raise ValueError("SIGNATURE_VERIFIER=ncanode requires NCANODE_URL")
         if self.smtp_host and "@" not in self.smtp_from:
             raise ValueError("SMTP_FROM must be an email address when SMTP_HOST is set")
         self.web_origin = self.web_origin.rstrip("/")
