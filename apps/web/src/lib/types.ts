@@ -153,3 +153,17 @@ export type NotificationItem = {
   data: { stage?: number; due_at?: string | null; assignee_name?: string };
 };
 export type NotificationPage = { total: number; unread: number; page: number; items: NotificationItem[] };
+
+export type Signature = {
+  id: string;
+  version_id: string;
+  mine: boolean;
+  signer_name: string;
+  status: "VALID" | "UNVERIFIED";
+  subject_name: string | null;
+  subject_iin: string | null;
+  subject_bin: string | null;
+  certificate_serial: string | null;
+  certificate_not_after: string | null;
+  created_at: string;
+};

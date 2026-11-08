@@ -9,6 +9,8 @@ test("scripts require the per-request nonce; inline scripts and eval are not all
   assert.ok(policy.includes("frame-ancestors 'none'"));
   assert.ok(policy.includes("object-src 'none'"));
   assert.ok(contentSecurityPolicy("n", true).includes("'unsafe-eval'"));
+  // Only same-origin requests plus the local NCALayer socket for ЭЦП.
+  assert.ok(policy.includes("connect-src 'self' wss://127.0.0.1:13579;"));
 });
 
 test("nonces are unpredictable base64 values", () => {
