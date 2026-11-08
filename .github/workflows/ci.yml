@@ -141,8 +141,11 @@ jobs:
           alembic upgrade head
           python -m app.seed
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > "$RUNNER_TEMP/api.log" 2>&1 &
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/v1/ready && exit 0; sleep 1; done
-          cat "$RUNNER_TEMP/api.log"; exit 1
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/api/v1/ready && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8000/api/v1/ready || { cat "$RUNNER_TEMP/api.log"; exit 1; }
+          # The presentation dataset must keep working against the real API (and is idempotent).
+          python -m app.demo --api http://127.0.0.1:8000
+          python -m app.demo --api http://127.0.0.1:8000 | grep -q "already present"
       - name: Build and start web
         working-directory: apps/web
         run: |
