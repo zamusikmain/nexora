@@ -100,7 +100,7 @@ export default function Page() {
           </button>
           {items.map((x) => (
             <button disabled={busy} key={x.id} onClick={() => choose(x)}>
-              {lang === "ru" ? x.name_ru : x.name_en} · v{x.version}
+              {lang !== "en" ? x.name_ru : x.name_en} · v{x.version}
             </button>
           ))}
         </div>
@@ -179,7 +179,7 @@ export default function Page() {
                         ))
                       : departments.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {lang === "ru" ? d.name_ru : d.name_en}
+                            {lang !== "en" ? d.name_ru : d.name_en}
                           </option>
                         ))}
                 </select>

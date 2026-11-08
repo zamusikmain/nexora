@@ -20,7 +20,7 @@ export function CustomFields({
           const value = values[f.key] ?? f.default;
           return (
             <label key={f.key}>
-              {lang === "ru" ? f.name_ru : f.name_en}
+              {lang !== "en" ? f.name_ru : f.name_en}
               {f.required ? " *" : ""}
               {f.kind === "boolean" ? (
                 <input

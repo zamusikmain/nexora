@@ -89,7 +89,7 @@ export default function Page() {
           </button>
           {items.map((x) => (
             <button disabled={busy} key={x.id} onClick={() => choose(x)}>
-              {lang === "ru" ? x.name_ru : x.name_en}
+              {lang !== "en" ? x.name_ru : x.name_en}
             </button>
           ))}
         </div>

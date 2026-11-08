@@ -259,7 +259,7 @@ export default function Page() {
                       <dd>
                         {
                           types.find((v) => v.id === doc.type_id)?.[
-                            lang === "ru" ? "name_ru" : "name_en"
+                            lang !== "en" ? "name_ru" : "name_en"
                           ]
                         }
                       </dd>
