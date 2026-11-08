@@ -262,6 +262,8 @@ class Approval(Base):
     status: Mapped[str] = mapped_column(String(30))
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     acted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set once by `python -m app.workflow_escalation` when the overdue task was escalated.
+    escalated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WorkflowEvent(Base):
@@ -397,6 +399,44 @@ class OperationKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Signed key expiry; NULL for legacy client UUID keys, which are never purged automatically.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class Notification(Base):
+    """In-app notification and email outbox row, written in the transaction that caused it.
+
+    Rows carry identifiers only; titles are resolved at read time through the ACL, so a
+    notification never reveals more than its recipient may currently read.
+    """
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        UniqueConstraint("recipient_id", "dedupe_key", name="uq_notification_dedupe"),
+        CheckConstraint(
+            "kind IN ('TASK_ASSIGNED','TASK_CANCELLED','TASK_OVERDUE','TASK_ESCALATED',"
+            "'WORKFLOW_APPROVED','WORKFLOW_REJECTED','WORKFLOW_RETURNED','WORKFLOW_OVERDUE')",
+            name="notification_kind",
+        ),
+        CheckConstraint(
+            "email_status IN ('NONE','PENDING','SENT','FAILED','SKIPPED')", name="notification_email_status"
+        ),
+        Index("ix_notifications_recipient_created", "recipient_id", "created_at"),
+        Index("ix_notifications_unread", "recipient_id", postgresql_where=text("read_at IS NULL")),
+        Index("ix_notifications_email_pending", "created_at", postgresql_where=text("email_status = 'PENDING'")),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    recipient_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    kind: Mapped[str] = mapped_column(String(30))
+    document_id: Mapped[str] = mapped_column(ForeignKey("documents.id"))
+    instance_id: Mapped[str | None] = mapped_column(ForeignKey("workflow_instances.id"))
+    approval_id: Mapped[str | None] = mapped_column(ForeignKey("approvals.id"))
+    actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_status: Mapped[str] = mapped_column(String(10), default="NONE", server_default="NONE")
+    email_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class WorkflowRequirement(Base):

@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     operation_key_epoch: int = Field(default=1, ge=1)
     # Client UUID keys are refused from this instant; unset accepts them (development only).
     legacy_operation_keys_until: datetime | None = None
+    # Email copies of notifications (python -m app.notification_dispatch). Empty host disables email.
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_starttls: bool = True
     seed_demo: bool = False
     demo_password: str = ""
     malware_scanner: Literal["disabled-development", "clamav"] = "disabled-development"
@@ -55,6 +62,10 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires OPERATION_KEY_SECRET of at least 32 characters")
             if self.legacy_operation_keys_until is None:
                 raise ValueError("Production requires LEGACY_OPERATION_KEYS_UNTIL (end of legacy key retries)")
+            if self.smtp_host and not self.smtp_starttls:
+                raise ValueError("Production email requires SMTP_STARTTLS")
+        if self.smtp_host and "@" not in self.smtp_from:
+            raise ValueError("SMTP_FROM must be an email address when SMTP_HOST is set")
         self.web_origin = self.web_origin.rstrip("/")
         if self.legacy_operation_keys_until and self.legacy_operation_keys_until.tzinfo is None:
             self.legacy_operation_keys_until = self.legacy_operation_keys_until.replace(tzinfo=UTC)

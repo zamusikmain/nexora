@@ -36,7 +36,10 @@ GRANTS = {
     # DELETE adds nothing beyond UPDATE (which can already reset failures) and lets the
     # runtime connection run `python -m app.auth_cleanup` for stale windows.
     "login_throttles": "SELECT, INSERT, UPDATE, DELETE",
+    # Content columns are immutable for the runtime; only read and email-delivery state change.
+    "notifications": "SELECT, INSERT",
 }
+NOTIFICATION_STATE_COLUMNS = "read_at, email_status, email_attempts, email_sent_at"
 
 
 def provision(conn, passwords):
@@ -124,6 +127,8 @@ def provision(conn, passwords):
     # SELECT FOR UPDATE needs UPDATE on at least one column. Do not grant token/identity mutation.
     if "auth_sessions" in names:
         conn.execute("GRANT UPDATE (user_agent) ON TABLE public.auth_sessions TO nexora_runtime")
+    if "notifications" in names:
+        conn.execute(f"GRANT UPDATE ({NOTIFICATION_STATE_COLUMNS}) ON TABLE public.notifications TO nexora_runtime")
     if sequences:
         conn.execute("GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO nexora_runtime")
     conn.execute("GRANT SELECT ON ALL TABLES IN SCHEMA public TO nexora_backup")
