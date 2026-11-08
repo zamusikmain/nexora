@@ -1,10 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ru, en } from "../src/lib/i18n.ts";
-test("RU and EN have matching complete dictionaries", () => {
+import { kk } from "../src/lib/i18n-kk.ts";
+test("RU, KK and EN have matching complete dictionaries", () => {
   assert.deepEqual(Object.keys(ru).sort(), Object.keys(en).sort());
-  for (const value of [...Object.values(ru), ...Object.values(en)])
+  assert.deepEqual(Object.keys(kk).sort(), Object.keys(ru).sort());
+  for (const value of [...Object.values(ru), ...Object.values(kk), ...Object.values(en)])
     assert.ok(value.trim());
+});
+test("Kazakh texts are actually Kazakh, not copied Russian", () => {
+  // Words spelled identically in both languages, and the language names themselves.
+  const shared = ["languageRu", "languageKk", "code", "audit", "bytes", "accessAction_card", "accessAction_file"];
+  const same = Object.keys(ru).filter((key) => /[а-яё]/i.test(ru[key]) && kk[key] === ru[key]);
+  assert.deepEqual(same.sort(), shared.sort());
 });
 test("Every implemented status and audit event is translated", () => {
   for (const key of [

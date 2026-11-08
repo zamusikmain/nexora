@@ -80,7 +80,7 @@ export default function Page() {
             >
               {types.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {lang === "ru" ? item.name_ru : item.name_en}
+                  {lang !== "en" ? item.name_ru : item.name_en}
                 </option>
               ))}
             </select>

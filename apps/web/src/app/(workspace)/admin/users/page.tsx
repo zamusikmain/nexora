@@ -99,7 +99,7 @@ export default function Page() {
                 <option value="">—</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {lang === "ru" ? d.name_ru : d.name_en}
+                    {lang !== "en" ? d.name_ru : d.name_en}
                   </option>
                 ))}
               </select>

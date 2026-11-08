@@ -8,6 +8,9 @@ import {
 } from "react";
 
 import { en, ru } from "@/lib/i18n";
+import { kk } from "@/lib/i18n-kk";
+
+const dictionaries: Record<string, Record<string, string>> = { ru, kk, en };
 
 const Context = createContext<{
   lang: string;
@@ -34,7 +37,7 @@ function snapshot() {
   } catch {
     /* Storage unavailable: keep the in-memory choice. */
   }
-  return stored === "en" ? "en" : "ru";
+  return stored === "en" || stored === "kk" ? stored : "ru";
 }
 
 export function Provider({ children }: { children: React.ReactNode }) {
@@ -54,7 +57,7 @@ export function Provider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event("nexora-language"));
   }
 
-  const dict = lang === "en" ? en : ru;
+  const dict = dictionaries[lang] || ru;
 
   return (
     <Context.Provider value={{ lang, setLang, t: (key) => dict[key] || key }}>
@@ -76,6 +79,7 @@ export function Language() {
       onChange={(e) => setLang(e.target.value)}
     >
       <option value="ru">{t("languageRu")}</option>
+      <option value="kk">{t("languageKk")}</option>
       <option value="en">{t("languageEn")}</option>
     </select>
   );
