@@ -671,6 +671,7 @@ Object.assign(en, {
   WORKFLOW_REQUIREMENT_UPDATED: "Required workflow updated",
 });
 Object.assign(ru, {
+  languageKk: "Қазақша",
   notifications: "Уведомления",
   open: "Открыть",
   unreadNotifications: "Непрочитанных уведомлений",
@@ -691,6 +692,7 @@ Object.assign(ru, {
   NOTIFICATION_EMAILS_SENT: "Отправлены email-уведомления",
 });
 Object.assign(en, {
+  languageKk: "Қазақша",
   notifications: "Notifications",
   open: "Open",
   unreadNotifications: "Unread notifications",

@@ -9,6 +9,16 @@ test("Russian is the default and the language choice survives a reload", async (
   await expect(page.getByRole("heading", { name: "Sign in to your workspace" })).toBeVisible();
 });
 
+test("Kazakh can be chosen, sets the document language and survives a reload", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("combobox").selectOption("kk");
+  await expect(page.getByRole("heading", { name: "Жұмыс кеңістігіне кіру" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Кіру" })).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "kk");
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Жұмыс кеңістігіне кіру" })).toBeVisible();
+});
+
 test("wrong password is rejected without revealing which field was wrong", async ({ page }) => {
   await preferEnglish(page);
   await page.goto("/login");
