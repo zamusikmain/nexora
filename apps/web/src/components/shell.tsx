@@ -26,6 +26,25 @@ export function Shell({ children }: { children: React.ReactNode }) {
     window.addEventListener("nexora-unauthorized", expired);
     return () => window.removeEventListener("nexora-unauthorized", expired);
   }, [router]);
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const refresh = () =>
+      api<{ unread: number }>("/notifications/summary")
+        .then((x) => active && setUnread(x.unread))
+        .catch(() => undefined);
+    refresh();
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("nexora-notifications", refresh);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("nexora-notifications", refresh);
+    };
+  }, [user]);
   async function logout() {
     try {
       await api("/auth/logout", { method: "POST" });
@@ -39,6 +58,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     ["/dashboard", "dashboard"],
     ["/documents", "documents"],
     ["/approvals", "approvals"],
+    ["/notifications", "notifications"],
     ["/access", "accessRequests"],
     ["/settings/security", "securitySessions"],
     ...(user?.role === "ADMIN"
@@ -67,6 +87,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 href={href}
               >
                 {t(label)}
+                {href === "/notifications" && unread > 0 && (
+                  <span className="count" aria-label={`${t("unreadNotifications")}: ${unread}`}>
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>

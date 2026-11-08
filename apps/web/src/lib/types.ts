@@ -141,3 +141,15 @@ export type WorkflowInstance = {
     created_at: string;
   }[];
 };
+
+export type NotificationItem = {
+  id: string;
+  kind: string;
+  created_at: string;
+  read_at: string | null;
+  href: string | null;
+  actor_name: string | null;
+  document: { id: string; number: string; title: string } | null;
+  data: { stage?: number; due_at?: string | null; assignee_name?: string };
+};
+export type NotificationPage = { total: number; unread: number; page: number; items: NotificationItem[] };
