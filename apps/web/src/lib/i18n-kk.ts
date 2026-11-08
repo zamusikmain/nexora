@@ -116,6 +116,7 @@ export const kk: Record<string, string> = {
   already_signed: "Сіз бұл нұсқаға қол қойып қойғансыз.",
   DOCUMENT_SIGNED: "Құжатқа ЭЦҚ-мен қол қойылды",
   SIGNATURE_REJECTED: "ЭЦҚ қолтаңбасы тексеруден өтпеді",
+  DEMO_DATA_LOADED: "Демонстрациялық деректер жүктелді",
   documentTypes: "Құжат түрлері",
   fieldKey: "Өріс кілті",
   fieldKind: "Өріс түрі",
